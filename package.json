@@ -1,0 +1,12 @@
+{
+  "name": "uravu",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Uravu – உறவு: family and friends, in Tamil and English",
+  "scripts": {
+    "start": "node serve.js 8080",
+    "test": "node --experimental-websocket test/run-tests.mjs",
+    "icons": "python tools/make_icons.py"
+  },
+  "engines": { "node": ">=20" }
+}

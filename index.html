@@ -4,6 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Uravu – உறவு</title>
+<meta name="description" content="Family and friends, in Tamil and English">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121418" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Uravu">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/icon-192.png" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Hind+Madurai:wght@400;500;600;700&family=Noto+Serif+Tamil:wght@500;700&display=swap" rel="stylesheet">
@@ -54,7 +65,7 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stro
 .av.add{border:1.5px dashed var(--line);background:transparent}
 
 /* home top */
-.homebar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;align-items:center;gap:10px;padding:12px 0 8px}
+.homebar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;align-items:center;gap:10px;padding:12px 16px 8px;margin:0 -16px}
 .pill{flex:1;display:flex;align-items:center;gap:10px;background:var(--soft);border-radius:999px;height:52px;padding:0 18px;color:var(--muted)}
 .pill:focus-within{outline:2px solid var(--primary)}
 .pill input{flex:1;min-width:0;border:0;background:transparent;font:inherit;font-size:16px;color:var(--ink);height:100%}
@@ -438,10 +449,104 @@ body.tree-full .tree-wrap{position:fixed;inset:0;z-index:35;background:var(--bg)
 body.tree-full .tree-scroll{flex:1;margin:0;border:1px solid var(--line);border-radius:16px}
 .toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 20px;border-radius:999px;font-weight:600;z-index:30;opacity:0;pointer-events:none;transition:opacity .2s;white-space:nowrap}
 .toast.show{opacity:1}
+
+/* ---------- app shell: bottom tabs, ＋ button, sheets, transitions ---------- */
+:root{--badge:#E5283E;--badge-ink:#FFFFFF;--shadow:0 6px 20px rgba(16,24,40,.18)}
+body.has-tabs{padding-bottom:calc(150px + env(safe-area-inset-bottom,0px))}
+body.has-tabs .toast{bottom:calc(150px + env(safe-area-inset-bottom,0px))}
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--bg);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabbar[hidden]{display:none}
+.tabbar .in{display:grid;grid-template-columns:repeat(4,1fr);max-width:640px;margin:0 auto}
+.tab{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;min-height:66px;padding:8px 2px 9px;font-size:.78rem;font-weight:600;color:var(--muted);line-height:1.15;-webkit-tap-highlight-color:transparent}
+.tab .pip{width:62px;height:32px;border-radius:999px;display:grid;place-items:center;transition:background .2s}
+.tab svg.i{width:24px;height:24px}
+.tab[aria-current="page"]{color:var(--ink)}
+.tab[aria-current="page"] .pip{background:var(--primary-soft);color:var(--primary)}
+.tab[aria-current="page"] svg.i{stroke-width:2.3}
+.dot{position:absolute;top:-6px;right:-8px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:var(--badge);color:var(--badge-ink);font-size:.72rem;font-weight:800;line-height:1;display:grid;place-items:center;border:2px solid var(--bg);font-family:var(--sans)}
+.tab .dot{top:2px;right:calc(50% - 30px)}
+.fab{position:fixed;z-index:21;right:max(16px,calc(50% - 304px));bottom:calc(84px + env(safe-area-inset-bottom,0px));width:60px;height:60px;border-radius:20px;background:var(--primary);color:var(--primary-ink);display:grid;place-items:center;box-shadow:var(--shadow);transition:transform .2s}
+.fab svg.i{width:30px;height:30px;stroke-width:2.4;transition:transform .2s}
+.fab[aria-expanded="true"] svg.i{transform:rotate(45deg)}
+.fab:active{transform:scale(.94)}
+.fab[hidden]{display:none}
+.bar.top{height:64px;margin:0}
+.bar.top h1{font-size:1.45rem}
+.qa .ic{position:relative}
+.qa .ic .dot{top:-4px;right:-4px}
+.qa .ic.soft{background:var(--primary-soft);color:var(--primary)}
+.r,.ppl,.tnode,.fam,.up{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.r .badge.hot,.badge.hot{background:var(--badge);color:var(--badge-ink)}
+
+/* bottom sheets */
+#sheet[hidden]{display:none}
+.scrim{position:fixed;inset:0;z-index:50;background:rgba(10,14,20,.45);animation:fadeIn .2s ease-out}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:51;max-width:640px;margin:0 auto;max-height:92vh;max-height:92dvh;overflow:auto;overscroll-behavior:contain;
+  background:var(--bg);border-radius:26px 26px 0 0;padding:0 16px;box-shadow:0 -8px 30px rgba(0,0,0,.18);animation:sheetUp .28s cubic-bezier(.2,.8,.2,1)}
+.sheet:focus{outline:none}
+.sheet::after{content:"";display:block;height:calc(18px + env(safe-area-inset-bottom,0px))}
+.sheet:has(.savebar)::after{display:none}
+.sheet-drag{position:sticky;top:0;z-index:4;background:var(--bg);padding:8px 0 2px;margin:0 -16px;touch-action:none;cursor:grab}
+.grab{display:block;width:42px;height:5px;border-radius:3px;background:var(--line);margin:0 auto}
+.sheet .bar{position:sticky;top:15px;height:56px;margin:0 -8px 0 0;touch-action:none}
+.sheet .bar h1{font-size:1.15rem}
+.sheet .savebar{position:sticky;bottom:0;left:auto;right:auto;margin:22px -16px 0;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px))}
+.sheet .pick{max-height:240px}
+#sheet.closing .scrim{animation:fadeOut .18s ease-in forwards}
+#sheet.closing .sheet{animation:sheetDown .18s ease-in forwards}
+body.sheet-open{overflow:hidden}
+.mgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:6px 0 4px}
+.mi{display:flex;flex-direction:column;align-items:flex-start;gap:10px;min-height:104px;padding:16px;border-radius:20px;background:var(--soft);text-align:left;font-weight:700;font-size:1rem;color:var(--ink);text-decoration:none}
+.mi .ic{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;background:var(--primary);color:var(--primary-ink)}
+.mi .ic svg.i{width:24px;height:24px}
+.mi:active{transform:scale(.97)}
+.qhead{display:flex;align-items:center;gap:14px;padding:6px 0 14px;touch-action:none}
+.qhead .av{width:56px;height:56px}
+.qhead .tx{display:flex;flex-direction:column;min-width:0;line-height:1.3}
+.qhead b{font-size:1.15rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qhead small{color:var(--muted);font-size:.9rem}
+.qgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;padding-bottom:4px}
+.qi{display:flex;flex-direction:column;align-items:center;gap:7px;padding:8px 0;border-radius:16px;font-size:.82rem;font-weight:600;color:var(--ink);text-decoration:none;text-align:center;line-height:1.2}
+.qi .ic{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;background:var(--primary-soft);color:var(--primary)}
+.qi.wa .ic{background:color-mix(in srgb,#25D366 18%,var(--bg));color:#128C4B}
+.qi.tel .ic{background:color-mix(in srgb,#1E7B3C 15%,var(--bg));color:#1E7B3C}
+.qi[aria-disabled="true"]{opacity:.45}
+.qi:active .ic{transform:scale(.92)}
+.install{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:12px 14px;border-radius:18px;background:var(--primary-soft);color:var(--ink);margin-top:14px}
+.install .ic{flex:none;width:44px;height:44px;border-radius:12px;background:var(--primary);color:var(--primary-ink);display:grid;place-items:center}
+.install span{display:flex;flex-direction:column;line-height:1.3}
+.install small{color:var(--muted)}
+
+/* page slides */
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes fadeOut{to{opacity:0}}
+@keyframes sheetUp{from{transform:translateY(100%)}to{transform:none}}
+@keyframes sheetDown{to{transform:translateY(100%)}}
+@keyframes inR{from{transform:translateX(26%);opacity:0}to{transform:none;opacity:1}}
+@keyframes inL{from{transform:translateX(-20%);opacity:0}to{transform:none;opacity:1}}
+.app.go-fwd{animation:inR .26s cubic-bezier(.2,.8,.2,1)}
+.app.go-back{animation:inL .24s cubic-bezier(.2,.8,.2,1)}
+.app.go-tab{animation:fadeIn .18s ease-out}
+.app.go-fwd .savebar,.app.go-back .savebar{animation:fadeIn .15s .24s both}
+@media (prefers-reduced-motion: reduce){
+  .app.go-fwd,.app.go-back,.app.go-tab,.sheet,.scrim,#sheet.closing .sheet,#sheet.closing .scrim,.app .savebar{animation:none!important}
+  .fab,.fab svg.i,.tab .pip{transition:none}
+}
+:root[data-theme="dark"]{--shadow:0 6px 20px rgba(0,0,0,.5)}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--shadow:0 6px 20px rgba(0,0,0,.5)}
+  :root:not([data-theme="light"]) .qi.wa .ic{color:#5BE08F}
+  :root:not([data-theme="light"]) .qi.tel .ic{color:#7DD99A}
+}
+:root[data-theme="dark"] .qi.wa .ic{color:#5BE08F}
+:root[data-theme="dark"] .qi.tel .ic{color:#7DD99A}
 </style>
 </head>
 <body>
 <main class="app" id="app"></main>
+<button class="fab" id="fab" data-act="fab" aria-label="Add" aria-haspopup="dialog" aria-expanded="false" hidden></button>
+<nav class="tabbar" id="tabbar" aria-label="Main" hidden></nav>
+<div id="sheet" hidden></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script>
 /* ---------- basics ---------- */
@@ -552,6 +657,13 @@ const ICON = {
   spark: sv('<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>'),
   link: sv('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'),
   swap: sv('<path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4"/>'),
+  people: sv('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6.2 6.5-6.2s6.5 2.6 6.5 6.2"/><circle cx="17.2" cy="9" r="2.7"/><path d="M16.4 14c3 0 5.1 2.3 5.1 5.4"/>'),
+  gift: sv('<rect x="3" y="8.5" width="18" height="4.5" rx="1"/><path d="M5 13v8h14v-8M12 8.5V21M12 8.5c-1.8-3.8-6-4.2-6-1.7 0 1.2 1.5 1.7 6 1.7zM12 8.5c1.8-3.8 6-4.2 6-1.7 0 1.2-1.5 1.7-6 1.7z"/>'),
+  doc: sv('<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>'),
+  rupee: sv('<path d="M7 4h10M7 8.5h10M8 4c5.5 0 5.5 9 0 9h-1l8 8"/>'),
+  edit: sv('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>'),
+  open: sv('<circle cx="12" cy="12" r="9"/><path d="M10.5 8l4 4-4 4"/>'),
+  install: sv('<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 7v7M9 11l3 3 3-3M10 18.5h4"/>'),
 };
 
 /* ---------- sample family ---------- */
@@ -629,8 +741,9 @@ function load() {
   } catch (e) {}
   S = demo(); save(true);
 }
+let dataVer = 0;   // goes up on every save, so the page under an open sheet knows to redraw
 function save(quiet) {
-  kc = {};
+  kc = {}; dataVer++;
   try { localStorage.setItem(KEY, JSON.stringify(S)); }
   catch (e) { if (!quiet) toast('Couldn’t save. Try a smaller photo.'); }
 }
@@ -1001,11 +1114,15 @@ function pplItem(p, n = 0) {
 }
 function personRow(p, extra = '') {
   const bd = p.dob && !p.dead ? nextOcc(p.dob) : null;
-  const badge = bd && bd.days <= 14 ? `<span class="badge">${bd.days === 0 ? 'Birthday today' : '🎂 ' + bd.days + 'd'}</span>` : '';
+  const badge = bd && bd.days <= 14 ? `<span class="badge${bd.days === 0 ? ' hot' : ''}">${bd.days === 0 ? '🎂 Today' : '🎂 ' + bd.days + 'd'}</span>` : '';
   return `<button class="r" data-act="person" data-id="${esc(p.id)}">${avatar(p)}
     <span class="tx"><span class="t1">${esc(p.id === S.me ? p.name + ' (you)' : p.name)}</span><span class="t2">${termLine(kinOf(p.id))}${p.dead ? ', passed away' : ''}</span>${extra}</span>${badge}</button>`;
 }
-const bar = (title, right = '') => `<header class="bar"><button class="icon-btn" data-act="back" aria-label="Back">${ICON.back}</button><h1>${title}</h1>${right}<button class="icon-btn" data-act="go-home" aria-label="Home" title="Home">${ICON.home}</button></header>`;
+let inSheet = false;   // true while a page is being drawn inside a bottom sheet
+const bar = (title, right = '') => inSheet
+  ? `<header class="bar sheet-bar"><h1>${title}</h1>${right}<button class="icon-btn" data-act="back" aria-label="Close">${ICON.x}</button></header>`
+  : ui.stack.length === 1 ? `<header class="bar top"><h1>${title}</h1>${right}</header>`
+  : `<header class="bar"><button class="icon-btn" data-act="back" aria-label="Back">${ICON.back}</button><h1>${title}</h1>${right}<button class="icon-btn" data-act="go-home" aria-label="Home" title="Home">${ICON.home}</button></header>`;
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); t.classList.toggle('long', msg.length > 44); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), Math.max(2200, msg.length * 60)); }
 function circlePeople(c) {
   const list = Object.values(S.people).filter(p => p.id !== S.me && ((p.circle === c && (c === 'family' || knownDirectly(p.id))) || (c !== 'family' && (p.also || []).includes(c))));
@@ -1021,18 +1138,14 @@ function pgHome() {
 }
 function homeBody() {
   if (ui.q.trim()) return `${aiAvailable !== false ? `<button class="askrow" data-act="ask-q">${ICON.spark}<span>Ask Uravu: “${esc(ui.q.trim())}”</span></button>` : ''}<div class="rows" style="margin-top:6px">${resultsHTML(ui.q)}</div>`;
-  const qa = [['new', '', ICON.addPerson, 'Add person'], ['event-new', '', ICON.addDate, 'Add date'], ['go', 'family', ICON.tree, 'Family tree'], ['go', 'connect', ICON.link, 'How connected']];
-  let h = `<div class="qa">${qa.map(([a, id, ic, l]) => `<button data-act="${a}" data-id="${id}"><span class="ic">${ic}</span>${l}</button>`).join('')}</div>`;
-  { const fs = (S.funcs || []).filter(f => !f.on || daysUntil(f.on) >= 0).sort((a, b) => String(a.on || '9').localeCompare(String(b.on || '9'))), nx = fs[0];
-    h += `<button class="askbar docbar" data-act="go" data-id="funcs"><span class="docic">🎉</span><span><b>Functions &amp; guest lists</b><small>${nx ? `${esc(nx.title)}${nx.on ? ', in ' + daysUntil(nx.on) + ' days' : ''}: ${funcStats(nx).inv} of ${funcStats(nx).n} invited` : 'Naming ceremony, wedding, housewarming: who to invite'}</small></span></button>`;
-    { const L = moiLedger(), mg = L.reduce((a, x) => a + x.got, 0), mv = L.reduce((a, x) => a + x.gave, 0);
-      h += `<button class="askbar docbar" data-act="go" data-id="moi"><span class="docic">💰</span><span><b>Moi notebook</b><small>${L.length ? `Received ${esc(money(mg))}, gave ${esc(money(mv))}` : 'What you received and what you gave, person by person'}</small></span></button>`; } }
-  { const ds = S.docs || [], n = ds.filter(d => isDueSoon(d, nextDue(d))).length;
-    h += `<button class="askbar docbar" data-act="go" data-id="docs"><span class="docic">📁</span><span><b>Documents &amp; renewals</b><small>${ds.length ? `${ds.length} saved${n ? `, <span class="soon-txt">${n} due soon</span>` : ''}` : 'Insurance, licence, Aadhaar, passport, with reminders'}</small></span></button>`; }
+  const b = badges();
+  const tile = (id, ic, l, n, hint) => `<button data-act="go" data-id="${id}"${n ? ` aria-label="${l}, ${n} ${hint}"` : ''}><span class="ic">${ic}${n ? `<span class="dot" aria-hidden="true">${n}</span>` : ''}</span>${l}</button>`;
+  let h = `<div class="qa">${tile('dates', ICON.cake, 'Dates', b.today, 'today')}${tile('docs', ICON.doc, 'Documents', b.dues, 'due')}${tile('moi', ICON.rupee, 'Moi')}${tile('connect', ICON.link, 'Connected')}</div>`;
+  if (installEvt) h += installRow();
   if (aiAvailable !== false) h += `<button class="askbar" data-act="go" data-id="ask">${ICON.spark}<span><b>Ask Uravu</b><small>“What does Amma like?” “Whose birthday is next?”</small></span></button>`;
-  if (needsBackup()) h += `<button class="pov-note" data-act="go" data-id="settings" style="display:block;width:100%;text-align:left;margin-top:12px">Your ${Object.keys(S.people).length} people are saved only in this browser. <b style="color:var(--primary)">Save a backup</b></button>`;
+  if (needsBackup()) h += `<button class="pov-note" data-act="go" data-id="settings" style="display:block;width:100%;text-align:left;margin-top:12px">💾 Saved only on this phone. <b style="color:var(--primary)">Back up now</b></button>`;
   const missingG = noGender().length;
-  if (missingG) h += `<button class="pov-note" data-act="go" data-id="genders" style="display:block;width:100%;text-align:left;margin-top:18px">${missingG} ${missingG === 1 ? 'person has' : 'people have'} no gender saved, so some Tamil words may be wrong. <b style="color:var(--primary)">Fix all in one place</b></button>`;
+  if (missingG) h += `<button class="pov-note" data-act="go" data-id="genders" style="display:block;width:100%;text-align:left;margin-top:12px">${missingG} without gender, so some Tamil words may be wrong. <b style="color:var(--primary)">Fix</b></button>`;
   const up = upcoming().filter(x => x.days <= 30);
   h += `<div class="sh"><h2>Coming up</h2><button data-act="go" data-id="dates">See all</button></div>`;
   h += up.length ? `<div class="hs">${up.map(upCard).join('')}</div>` : `<p class="empty">No birthdays or anniversaries in the next 30 days.</p>`;
@@ -1048,7 +1161,7 @@ function homeBody() {
     else h += `<button class="ppl" data-act="new" data-id="" data-circle="${c}"><span class="av add">${ICON.plus}</span><span class="nm">Add</span></button>`;
     h += `</div>`;
   }
-  return h + `<p class="note">Prototype: what you add is saved only in this browser.</p>`;
+  return h;
 }
 function hl(text, q) {
   const s = String(text), i = s.toLowerCase().indexOf(q);
@@ -1206,8 +1319,6 @@ document.addEventListener('keydown', e => {
 }, true);
 async function treePng() {
   const tree = $('.tree'); if (!tree) return;
-  const dl = window.claude ? await window.claude.use('downloads').catch(() => null) : null;
-  if (!dl) { toast('Saving images isn’t available here.'); return; }
   const css = getComputedStyle(document.documentElement), v = n => css.getPropertyValue(n).trim();
   const W = Number(tree.dataset.w), H0 = Number(tree.dataset.h), top = 56, H = H0 + top + 20, sc2 = 2;
   const x = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&apos;' }[c]));
@@ -1269,9 +1380,10 @@ async function treePng() {
     const cv = document.createElement('canvas'); cv.width = W * sc2; cv.height = H * sc2;
     cv.getContext('2d').drawImage(img, 0, 0);
     const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
-    if (!blob) throw new Error('no image');
-    await dl.save({ filename: `uravu-family-tree-${new Date().toISOString().slice(0, 10)}.png`, data: blob });
-  } catch (e) { if (e && e.code === 'declined') return; toast(e && e.code === 'too_large' ? 'The tree is too big for one image. Try “Close family”.' : 'Couldn’t make the image here.'); }
+    if (!blob) { toast('The tree is too big for one image. Try “Close family”.'); return; }
+    saveFile(`uravu-family-tree-${new Date().toISOString().slice(0, 10)}.png`, blob);
+    toast('Tree image saved');
+  } catch (e) { toast('Couldn’t make the image here.'); }
 }
 
 /* ---------- drawn family tree ---------- */
@@ -1978,6 +2090,7 @@ function pgSettings(c) {
   const sb = (act, v, l, cur) => `<button data-act="${act}" data-id="${v}" aria-pressed="${cur === v}">${l}</button>`;
   return bar('Settings') + `
     <button class="prof" data-act="edit" data-id="${esc(S.me)}">${avatar(me)}<span class="tx"><b>${esc(me.name)}</b><span>Edit my profile</span></span></button>
+    ${installRow()}
     <div class="fld"><span>Show relationship names in</span><div class="seg">${sb('lang', 'both', 'Both', lang)}${sb('lang', 'ta', 'தமிழ்', lang)}${sb('lang', 'en', 'English', lang)}</div></div>
     <div class="fld"><span>I am <span class="hint">Some Tamil words depend on this, like Machan</span></span><div class="seg">${sb('my-gender', 'm', 'Male', me.gender)}${sb('my-gender', 'f', 'Female', me.gender)}</div></div>
     <div class="fld"><span>Gender</span><button class="plain-btn" data-act="go" data-id="genders" style="margin-top:0">Update gender for everyone${noGender().length ? ` (${noGender().length} not set)` : ''}</button></div>
@@ -1987,7 +2100,7 @@ function pgSettings(c) {
         <div class="qbtns"><button class="btn-s p" data-act="restore-yes">Restore</button><button class="btn-s" data-act="restore-no">Cancel</button></div></div>`
       : `<button class="plain-btn" data-act="backup" style="margin-top:0">Save a backup file</button>
       <label class="plain-btn" style="display:grid;place-items:center;cursor:pointer">Restore from a backup file<input type="file" id="restoreIn" accept=".json,application/json" hidden></label>`}</div>
-    <div class="fld"><span>Prototype data <span class="hint">Both options replace what’s saved in this browser</span></span>
+    <div class="fld"><span>Start over <span class="hint">Both options replace what’s saved on this phone</span></span>
       <button class="plain-btn" data-act="reset-demo">Load the sample family</button>
       <button class="plain-btn danger" data-act="clear-all">Start with an empty list</button></div>`;
 }
@@ -2172,7 +2285,7 @@ function funcRow(f) {
   const st = funcStats(f), days = f.on ? daysUntil(f.on) : null;
   return `<button class="r" data-act="func" data-id="${esc(f.id)}"><span class="docic">${funcIcon(f)}</span>
     <span class="tx"><span class="t1">${esc(f.title)}</span><span class="t2">${f.on ? fmtDate(f.on) + ', ' : ''}${st.inv} of ${st.n} invited</span></span>
-    ${days != null && days >= 0 ? `<span class="badge${days <= 14 ? '' : ' calm'}">${days === 0 ? 'Today' : days + 'd'}</span>` : ''}</button>`;
+    ${days != null && days >= 0 ? `<span class="badge${days <= 14 ? ' hot' : ' calm'}">${days === 0 ? 'Today' : days + 'd'}</span>` : ''}</button>`;
 }
 function pgFuncs() {
   const fs = (S.funcs || []).slice().sort((a, b) => String(a.on || '9').localeCompare(String(b.on || '9')));
@@ -2180,7 +2293,7 @@ function pgFuncs() {
   return bar('Functions', `<button class="icon-btn" data-act="func-new" aria-label="Plan a function">${ICON.plus}</button>`) +
     (fs.length ? `${up.length ? `<div class="rows">${up.map(funcRow).join('')}</div>` : ''}${past.length ? `<p class="subh" style="margin:16px 0 2px">Finished</p><div class="rows">${past.map(funcRow).join('')}</div>` : ''}`
       : `<p class="empty">Plan a naming ceremony, wedding or housewarming. Pick guests from your people, tick them off as you invite them, and track who is coming.</p>`) +
-    `<button class="plain-btn" data-act="go" data-id="moi" style="margin-top:18px">💰 Moi notebook</button><button class="btn-p" data-act="func-new" style="margin-top:10px">＋ Plan a function</button>`;
+    `<button class="plain-btn" data-act="go" data-id="moi" style="margin-top:18px">💰 Moi notebook</button>${ui.stack.length === 1 ? '' : `<button class="btn-p" data-act="func-new" style="margin-top:10px">＋ Plan a function</button>`}`;
 }
 function guestRow(f, g, open) {
   const p = g.pid ? S.people[g.pid] : null, k = p && g.pid !== S.me ? kinOf(g.pid) : null;
@@ -2393,15 +2506,21 @@ function dataUrlToBlob(u) {
   const bin = atob(b64), arr = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
   return new Blob([arr], { type: mime });
 }
+// A normal browser download (goes to the phone's Downloads folder)
+function saveFile(filename, data, type) {
+  const blob = data instanceof Blob ? data : new Blob([data], { type: type || 'application/octet-stream' });
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = filename; a.style.display = 'none';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
 async function saveDocFile(pid) {
   const d = S.docs.find(x => x.id === cur().id), meta = (d.fileMeta || {})[pid] || { kind: 'image', name: 'photo.jpg' };
-  const dl = window.claude ? await window.claude.use('downloads').catch(() => null) : null;
-  if (!dl) { toast('Saving files isn’t available here.'); return; }
   try {
     const data = await IDB.get(pid); if (!data) { toast('This file isn’t on this device.'); return; }
     const base = docTitle(d).replace(/[^\w\- ]+/g, '').trim() || 'document';
-    await dl.save({ filename: meta.kind === 'pdf' ? (meta.name || base + '.pdf') : `${base}.jpg`, data: dataUrlToBlob(data) });
-  } catch (e) { if (e.code !== 'declined') toast('Couldn’t save the file here.'); }
+    saveFile(meta.kind === 'pdf' ? (meta.name || base + '.pdf') : `${base}.jpg`, dataUrlToBlob(data));
+  } catch (e) { toast('Couldn’t save the file here.'); }
 }
 
 /* ---- pages ---- */
@@ -2410,7 +2529,7 @@ function docRow(d, showOwner) {
   const sub = x ? `${x.label}: ${fmtDate(x.date)}` : t.due.length ? 'No date saved yet' : (d.f.number ? mask(d.f.number) : 'No expiry');
   return `<button class="r" data-act="doc" data-id="${esc(d.id)}"><span class="docic">${t.icon}</span>
     <span class="tx"><span class="t1">${esc(docTitle(d))}</span><span class="t2">${showOwner ? esc(ownerName(d)) + ', ' : ''}${esc(sub)}</span></span>
-    ${x ? `<span class="badge${soon ? '' : ' calm'}">${x.days < 0 ? 'Overdue' : x.days <= 99 ? x.days + 'd' : fmtDate(x.date).slice(-4)}</span>` : ''}</button>`;
+    ${x ? `<span class="badge${soon ? ' hot' : ' calm'}">${x.days < 0 ? 'Overdue' : x.days <= 99 ? x.days + 'd' : fmtDate(x.date).slice(-4)}</span>` : ''}</button>`;
 }
 function dueCard(x) {
   const soon = isDueSoon(x.d, x);
@@ -2437,7 +2556,7 @@ function pgDocs(c) {
       : !list.length ? `<p class="empty">Nothing here.</p>`
       : groups.map(([o, ds]) => `${o ? `<p class="subh" style="margin:14px 0 2px">${esc(o === S.me ? 'You' : S.people[o].name)}</p>` : ''}<div class="rows">${ds.map(d => docRow(d, !o)).join('')}</div>`).join('')}
     <button class="btn-p" data-act="doc-new" data-id="" style="margin-top:18px">＋ Add a document</button>
-    <p class="hint-line" style="margin-top:18px;font-size:.84rem">Saved only in this browser, and included in your backup file. For Aadhaar, the last 4 digits are enough. The real app will keep these encrypted.</p>`;
+    <p class="hint-line" style="margin-top:18px;font-size:.84rem">Saved only on this phone, and included in your backup file. For Aadhaar, the last 4 digits are enough.</p>`;
 }
 function fieldRows(defs, f, reveal) {
   return defs.filter(([k]) => f[k] !== undefined && f[k] !== '').map(([k, label, kind]) => {
@@ -2519,7 +2638,7 @@ function saveTerm() {
   const c = cur(), d = S.docs.find(x => x.id === c.doc), t = dt(d), box = $('#tf');
   const f = {}; (t.term || []).forEach(([k]) => { const v = (box.querySelector(`[name="t_${k}"]`)?.value || '').trim(); if (v) f[k] = v; });
   if (c.term) d.terms.find(x => x.id === c.term).f = f; else d.terms.push({ id: uid(), f });
-  save(); ui.stack.pop(); render(); window.scrollTo(0, 0); toast(c.term ? 'Saved' : 'New policy saved. Reminders now follow the new dates.');
+  save(); ui.stack.pop(); render(); toast(c.term ? 'Saved' : 'New policy saved. Reminders now follow the new dates.');
 }
 function docResults(q) {
   const hits = (S.docs || []).filter(d => { const t = dt(d), lt = latestTerm(d); return [t.label, t.ta, d.title, d.note, ...Object.values(d.f), ...(lt ? Object.values(lt.f) : []), ownerName(d)].some(v => v && String(v).toLowerCase().includes(q)); });
@@ -2618,18 +2737,13 @@ function pgAsk(c) {
 
 /* ---------- backup ---------- */
 async function doBackup() {
-  const dl = window.claude ? await window.claude.use('downloads').catch(() => null) : null;
-  if (!dl) { toast('Saving files isn’t available here.'); return; }
   const when = new Date().toISOString();
   let photos = {}; try { photos = await IDB.all(); } catch (e) {}
   const data = JSON.stringify({ app: 'uravu', version: 1, savedAt: when, data: S, photos }, null, 1);
   try {
-    await dl.save({ filename: `uravu-backup-${when.slice(0, 10)}.json`, data });
-    S.settings.lastBackup = when; save(); rerender(); toast('Backup saved');
-  } catch (e) {
-    if (e.code === 'declined') return;
-    toast(e.code === 'rate_limited' ? 'Please wait a moment and try again.' : 'Couldn’t save the backup here.');
-  }
+    saveFile(`uravu-backup-${when.slice(0, 10)}.json`, data, 'application/json');
+    S.settings.lastBackup = when; save(); rerender(); toast('Backup saved to Downloads');
+  } catch (e) { toast('Couldn’t save the backup here.'); }
 }
 function readRestore(file) {
   if (!file) return;
@@ -2733,23 +2847,183 @@ function render() {
     if (c.p === 'term' && !(S.docs || []).some(d => d.id === c.doc)) { ui.stack.pop(); continue; }
     if (['func', 'funcadd'].includes(c.p) && !(S.funcs || []).some(f => f.id === c.id)) { ui.stack.pop(); continue; }
     if (c.p === 'funcedit' && c.id && !(S.funcs || []).some(f => f.id === c.id)) { ui.stack.pop(); continue; }
+    if (c.p === 'quick' && !S.people[c.id]) { ui.stack.pop(); continue; }
     break;
   }
-  const c = cur(), app = $('#app');
-  if (c.p === 'edit') { pendingPhoto = null; pendingLinks = []; pendingRemove = new Set(); pendingClicked = new Set(); }
-  if (c.p === 'family') {
-    EGO = c.pov && S.people[c.pov] ? c.pov : null; try { app.innerHTML = pgFamily(c); } finally { EGO = null; }
-    const eg = app.querySelector('.tnode.ego'), sc = app.querySelector('.tree-scroll');
-    if (eg && sc) { const z = c.zoom || 1; sc.scrollLeft = eg.offsetLeft * z - sc.clientWidth / 2 + TW * z / 2; if (c.full) sc.scrollTop = eg.offsetTop * z - sc.clientHeight / 2; }
-  }
-  else app.innerHTML = (PAGES[c.p] || pgHome)(c);
-  document.body.classList.toggle('tree-full', c.p === 'family' && !!c.full);
-  document.body.classList.toggle('has-save', ['edit', 'event', 'term', 'funcedit', 'funcadd'].includes(c.p) || (c.p === 'docedit' && !!(c.id || c.type)));
+  const top = cur(), sheetTop = ui.stack.length > 1 && isSheet(top), app = $('#app');
+  // Small tasks open in a bottom sheet over the page below them. The page below is drawn with the
+  // sheet taken off the stack for a moment, so cur() is right for it, then the sheet is drawn on top.
+  if (sheetTop) ui.stack.pop();
+  const c = cur();
+  try {
+    if (!sheetTop || c !== shell.base || shell.ver !== dataVer) {
+      const sameBase = c === shell.base, y = window.scrollY;
+      if (c.p === 'edit') { pendingPhoto = null; pendingLinks = []; pendingRemove = new Set(); pendingClicked = new Set(); }
+      if (c.p === 'family') {
+        EGO = c.pov && S.people[c.pov] ? c.pov : null; try { app.innerHTML = pgFamily(c); } finally { EGO = null; }
+        const eg = app.querySelector('.tnode.ego'), sc = app.querySelector('.tree-scroll');
+        if (eg && sc) { const z = c.zoom || 1; sc.scrollLeft = eg.offsetLeft * z - sc.clientWidth / 2 + TW * z / 2; if (c.full) sc.scrollTop = eg.offsetTop * z - sc.clientHeight / 2; }
+      }
+      else app.innerHTML = (PAGES[c.p] || pgHome)(c);
+      if (!sameBase && shell.dir) slide(app, shell.dir);
+      else if (sameBase) window.scrollTo(0, y);
+      shell.base = c; shell.ver = dataVer;
+      document.body.classList.toggle('tree-full', c.p === 'family' && !!c.full);
+      document.body.classList.toggle('has-save', ['edit', 'event', 'term', 'funcedit', 'funcadd'].includes(c.p) || (c.p === 'docedit' && !!(c.id || c.type)));
+      if (c.p === 'home') $('#q').value = ui.q;
+    }
+  } finally { if (sheetTop) ui.stack.push(top); }
+  shell.dir = null;
+  drawSheet(sheetTop ? top : null);
+  drawShell(ui.stack.length === 1 || (sheetTop && ui.stack.length === 2));
   hydratePhotos();
-  if (c.p === 'home') $('#q').value = ui.q;
+  syncHistory();
 }
-function push(p, params = {}) { cur().y = window.scrollY; ui.stack.push(Object.assign({ p }, params)); render(); window.scrollTo(0, 0); }
-function back() { if (ui.stack.length > 1) { ui.stack.pop(); render(); window.scrollTo(0, cur().y || 0); } }
+function push(p, params = {}) {
+  const entry = Object.assign({ p }, params);
+  if (!isSheet(entry)) cur().y = window.scrollY;
+  ui.stack.push(entry); shell.dir = 'fwd'; render();
+  if (!isSheet(entry)) window.scrollTo(0, 0);
+}
+// Back goes through the browser history, so the in-app back button, the phone's back gesture
+// and the Escape key all take the same path (see the popstate handler below).
+function back() {
+  if (histDepth > 0 && logicalDepth() > 0) { history.back(); return; }
+  if (ui.stack.length > 1) { ui.stack.pop(); shell.dir = 'back'; render(); window.scrollTo(0, cur().y || 0); }
+}
+
+/* ---------- app shell: tabs, ＋ menu, sheets, long-press, back gesture ---------- */
+const shell = { base: null, ver: -1, sheet: null, dir: null };
+const TABS = [['home', 'Home', 'home'], ['people', 'People', 'people'], ['family', 'Family tree', 'tree'], ['funcs', 'Functions', 'gift']];
+const SHEETS = ['event', 'pickp', 'funcedit', 'term', 'menu', 'quick'];
+const isSheet = c => SHEETS.includes(c.p) || (c.p === 'docedit' && !c.id && !c.type);
+function slide(el, dir) {
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  el.classList.remove('go-fwd', 'go-back', 'go-tab'); void el.offsetWidth; el.classList.add('go-' + dir);
+}
+document.addEventListener('animationend', e => { if (e.target.id === 'app') e.target.classList.remove('go-fwd', 'go-back', 'go-tab'); });
+// Counts for the red badges
+function badges() {
+  const t = upcoming().filter(x => x.days === 0);
+  const bdays = t.filter(x => x.kind === 'birthday').length;
+  const dues = (S.docs || []).filter(d => isDueSoon(d, nextDue(d))).length;
+  const funcs = (S.funcs || []).filter(f => f.on && daysUntil(f.on) >= 0 && daysUntil(f.on) <= 14).length;
+  return { today: t.length, bdays, dues, funcs };
+}
+function drawShell(show) {
+  const tb = $('#tabbar'), fab = $('#fab'), b = badges(), root = ui.stack[0].p;
+  const count = { home: b.dues, people: b.bdays, funcs: b.funcs };
+  const why = { home: 'renewals due', people: 'birthdays today', funcs: 'functions coming up' };
+  tb.hidden = !show; fab.hidden = !show || document.body.classList.contains('tree-full');
+  document.body.classList.toggle('has-tabs', show);
+  if (show) tb.innerHTML = `<div class="in">${TABS.map(([id, l, ic]) => { const n = count[id] || 0; return `<button class="tab" data-act="tab-go" data-id="${id}"${root === id ? ' aria-current="page"' : ''} aria-label="${l}${n ? `, ${n} ${why[id]}` : ''}"><span class="pip" style="position:relative">${ICON[ic]}${n ? `<span class="dot" aria-hidden="true">${n > 99 ? '99+' : n}</span>` : ''}</span>${l}</button>`; }).join('')}</div>`;
+  if (!fab.innerHTML) fab.innerHTML = ICON.plus;
+  fab.setAttribute('aria-expanded', String(cur().p === 'menu'));
+  // the number on the installed app's icon (Android / desktop, where supported)
+  const all = b.bdays + b.dues + b.funcs;
+  try { if (navigator.setAppBadge) (all ? navigator.setAppBadge(all) : navigator.clearAppBadge()).catch(() => {}); } catch (e) {}
+}
+function drawSheet(c) {
+  const host = $('#sheet');
+  document.body.classList.toggle('sheet-open', !!c);
+  if (!c) { host.hidden = true; host.innerHTML = ''; host.classList.remove('closing'); shell.sheet = null; return; }
+  let html; inSheet = true;
+  try { html = (PAGES[c.p] || pgMenu)(c); } finally { inSheet = false; }
+  const body = `<div class="sheet-drag" aria-hidden="true"><span class="grab"></span></div>${html}`;
+  if (shell.sheet === c && host.querySelector('.sheet')) { const sh = host.querySelector('.sheet'), st = sh.scrollTop; sh.innerHTML = body; sh.scrollTop = st; return; }
+  host.classList.remove('closing'); host.hidden = false; shell.sheet = c;
+  host.innerHTML = `<div class="scrim" data-act="back"></div><div class="sheet" role="dialog" aria-modal="true" tabindex="-1" aria-label="${esc(sheetLabel(c))}">${body}</div>`;
+  host.querySelector('.sheet').focus({ preventScroll: true });
+}
+const sheetLabel = c => ({ menu: 'Add', quick: 'Quick actions', event: 'Date', pickp: 'Choose a person', funcedit: 'Function', term: 'Policy', docedit: 'Add a document' })[c.p] || '';
+// ＋ menu
+function pgMenu() {
+  const it = (go, ic, l, id = '') => `<button class="mi" data-act="menu-go" data-go="${go}" data-id="${id}"><span class="ic">${ICON[ic]}</span>${l}</button>`;
+  return `<div class="mgrid">${it('new', 'addPerson', 'Add person')}${it('event-new', 'addDate', 'Add date')}${it('doc-new', 'doc', 'Add document')}${it('func-new', 'gift', 'Add function')}</div>`;
+}
+// Long-press a person: quick actions
+function pgQuick(c) {
+  const p = S.people[c.id], ph = p.phone ? phoneLinks(p) : null, isMe = p.id === S.me;
+  const it = (go, ic, l, cls = '') => `<button class="qi ${cls}" data-act="menu-go" data-go="${go}" data-id="${esc(p.id)}"><span class="ic">${ICON[ic]}</span>${l}</button>`;
+  const link = (href, ic, l, cls, ext) => ph ? `<a class="qi ${cls}" href="${esc(href)}"${ext ? ' target="_blank" rel="noopener"' : ''} data-close="1"><span class="ic">${ICON[ic]}</span>${l}</a>`
+    : `<button class="qi ${cls}" data-act="no-phone" data-id="${esc(p.id)}" aria-disabled="true"><span class="ic">${ICON[ic]}</span>${l}</button>`;
+  return `<div class="qhead">${avatar(p)}<span class="tx"><b>${esc(isMe ? p.name + ' (you)' : p.name)}</b><small>${isMe ? 'You' : termLine(kinOf(p.id))}</small></span></div>
+    <div class="qgrid">${link(ph ? 'tel:' + ph.tel : '', 'phone', 'Call', 'tel')}${link(ph ? 'https://wa.me/' + ph.wa : '', 'chat', 'WhatsApp', 'wa', true)}${it('edit', 'edit', 'Edit')}${it('event-new', 'addDate', 'Add date')}${it('person', 'open', 'Open')}</div>`;
+}
+PAGES.menu = pgMenu; PAGES.quick = pgQuick;
+
+let lp = null, lpFired = false;
+const LP_SEL = '[data-act="person"],[data-act="pov"]';
+function openQuick(id) {
+  if (!S.people[id] || cur().p === 'quick') return;
+  try { navigator.vibrate && navigator.vibrate(12); } catch (e) {}
+  if (cur().p === 'menu') ui.stack.pop();
+  push('quick', { id });
+}
+document.addEventListener('pointerdown', e => {
+  lpFired = false; clearTimeout(lp && lp.h); lp = null;
+  if (e.button > 0 || !e.target.closest) return;
+  const t = e.target.closest(LP_SEL); if (!t || !S.people[t.dataset.id] || t.closest('.sheet')) return;
+  lp = { x: e.clientX, y: e.clientY, h: setTimeout(() => { lp = null; lpFired = Date.now(); openQuick(t.dataset.id); }, 500) };
+});
+document.addEventListener('pointermove', e => { if (lp && Math.hypot(e.clientX - lp.x, e.clientY - lp.y) > 10) { clearTimeout(lp.h); lp = null; } });
+['pointerup', 'pointercancel', 'scroll'].forEach(ev => document.addEventListener(ev, () => { if (lp) { clearTimeout(lp.h); lp = null; } }, true));
+document.addEventListener('contextmenu', e => {
+  const t = e.target.closest && e.target.closest(LP_SEL); if (!t || !S.people[t.dataset.id] || t.closest('.sheet')) return;
+  e.preventDefault(); if (lp) { clearTimeout(lp.h); lp = null; }
+  if (cur().p !== 'quick') lpFired = Date.now(); openQuick(t.dataset.id);
+});
+// the tap that ends a long-press must not also open the person
+document.addEventListener('click', e => { if (lpFired) { const fresh = Date.now() - lpFired < 1500; lpFired = false; if (fresh) { e.preventDefault(); e.stopImmediatePropagation(); } } }, true);
+// Call / WhatsApp in the quick sheet: close the sheet behind them
+document.addEventListener('click', e => { const a = e.target.closest && e.target.closest('a[data-close]'); if (a) setTimeout(back, 300); });
+
+// Drag a sheet down by its handle or title to close it
+let sdrag = null;
+document.addEventListener('pointerdown', e => {
+  const h = e.target.closest && e.target.closest('.sheet-drag, .sheet .sheet-bar, .sheet .qhead'); if (!h || e.target.closest('button, a, input')) return;
+  const el = h.closest('.sheet'); sdrag = { y: e.clientY, el, dy: 0 }; el.style.transition = 'none';
+});
+document.addEventListener('pointermove', e => { if (!sdrag) return; sdrag.dy = Math.max(0, e.clientY - sdrag.y); sdrag.el.style.transform = sdrag.dy ? `translateY(${sdrag.dy}px)` : ''; });
+document.addEventListener('pointerup', () => {
+  if (!sdrag) return; const { el, dy } = sdrag; sdrag = null;
+  el.style.transition = 'transform .18s ease-out';
+  if (dy > 90) { el.style.transform = 'translateY(100%)'; back(); } else el.style.transform = '';
+});
+
+/* history: every page and sheet is one step, so the phone's back gesture walks back through them */
+let histDepth = 0, ignorePop = 0;
+// Home is the bottom of the stack; another tab counts as one step above it, so Back from it goes Home
+const logicalDepth = () => ui.stack.length - 1 + (ui.stack[0].p !== 'home' ? 1 : 0);
+function syncHistory() {
+  const want = logicalDepth();
+  if (want > histDepth) while (histDepth < want) history.pushState({ d: ++histDepth }, '');
+  else if (want < histDepth) { ignorePop++; history.go(want - histDepth); histDepth = want; }
+}
+// Close a viewer or full-screen tree first, before leaving the page
+function closeOverlay() {
+  const c = cur();
+  if (c.view) { delete c.view; rerender(); return true; }
+  if (c.p === 'family' && c.full) { c.full = false; rerender(); return true; }
+  if (document.querySelector('.ppick-dd:not([hidden])')) { ppickClose(); return true; }
+  return false;
+}
+window.addEventListener('popstate', e => {
+  const d = e.state && typeof e.state.d === 'number' ? e.state.d : 0;
+  if (ignorePop) { ignorePop--; histDepth = d; return; }
+  const want = logicalDepth();
+  histDepth = d;
+  if (d >= want) { if (d > want) { ignorePop++; history.go(want - d); histDepth = want; } return; }  // "forward": stay put
+  if (closeOverlay()) { syncHistory(); return; }
+  const apply = () => {
+    ppickClose();
+    while (logicalDepth() > d && ui.stack.length > 1) ui.stack.pop();
+    if (logicalDepth() > d) ui.stack = [{ p: 'home' }];
+    shell.dir = 'back'; render(); window.scrollTo(0, cur().y || 0);
+  };
+  if (isSheet(cur()) && $('#sheet .sheet')) { $('#sheet').classList.add('closing'); setTimeout(apply, 170); }
+  else apply();
+});
 function arm(btn, label, fn) {
   if (btn.dataset.armed) { fn(); return; }
   const old = btn.innerHTML; btn.dataset.armed = '1'; btn.classList.add('armed'); btn.textContent = label;
@@ -2759,6 +3033,15 @@ function pressOnly(btn, sel) { btn.closest('.relgrid, .chips, .seg')?.parentElem
 
 const H = {
   back: () => back(),
+  'tab-go': id => {
+    ppickClose();
+    if (ui.stack.length === 1 && ui.stack[0].p === id) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+    ui.stack = [{ p: id }]; shell.dir = 'tab'; render(); window.scrollTo(0, 0);
+  },
+  fab: () => { if (cur().p === 'menu') back(); else push('menu'); },
+  'menu-go': (id, a) => { ui.stack.pop(); const fn = H[a.dataset.go]; if (fn) fn(id, a); else render(); },
+  'no-phone': () => toast('No phone number saved. Tap Edit to add one.'),
+  install: () => installApp(),
   'tree-find': () => { const b = $('.tfind'); b.hidden = !b.hidden; if (!b.hidden) { $('#tfindIn').value = ''; treeFindList(); $('#tfindIn').focus(); } },
   'tree-goto': id => { $('.tfind').hidden = true; treeFocus(id, true); },
   'tree-center': () => treeFocus(ego(), true),
@@ -2778,10 +3061,9 @@ const H = {
   'func-save': () => saveFunc(),
   'func-del': (id, a) => arm(a, 'Tap again to delete', () => { S.funcs = S.funcs.filter(f => f.id !== id); save(); render(); toast('Function deleted'); }),
   'func-add': id => push('funcadd', { id }),
-  'func-txt': async id => {
-    const f = S.funcs.find(x => x.id === id), dl = window.claude ? await window.claude.use('downloads').catch(() => null) : null;
-    if (!dl) { toast('Saving files isn’t available here.'); return; }
-    try { await dl.save({ filename: `${f.title.replace(/[^\w\- ]+/g, '').trim() || 'guest-list'}-guests.txt`, data: funcText(f) }); } catch (e) { if (e.code !== 'declined') toast('Couldn’t save the list here.'); }
+  'func-txt': id => {
+    const f = S.funcs.find(x => x.id === id);
+    try { saveFile(`${f.title.replace(/[^\w\- ]+/g, '').trim() || 'guest-list'}-guests.txt`, funcText(f), 'text/plain;charset=utf-8'); toast('Guest list saved'); } catch (e) { toast('Couldn’t save the list here.'); }
   },
   'fa-open': id => { cur().sel = [...document.querySelectorAll('#faList input:checked')].map(i => i.value); push('person', { id }); },
   'fa-bulk': id => {
@@ -2808,7 +3090,7 @@ const H = {
   'g-rm': (id, a) => arm(a, 'Tap again', () => { const [f] = funcGuest(id); f.guests = f.guests.filter(g => g.id !== id); cur().open = null; save(); rerender(); toast('Removed from the list'); }),
   doc: id => push('doc', { id }),
   'doc-new': id => push('docedit', { id: '', owner: id || S.me }),
-  'doc-type': id => { cur().type = id; rerender(); window.scrollTo(0, 0); document.body.classList.add('has-save'); },
+  'doc-type': id => { const c = cur(); ui.stack.pop(); push('docedit', { id: '', owner: c.owner, type: id }); },
   'doc-edit': id => push('docedit', { id }),
   'doc-save': () => saveDoc(),
   'doc-reveal': () => { cur().reveal = !cur().reveal; rerender(); },
@@ -2820,7 +3102,7 @@ const H = {
   'photo-view': id => { cur().view = id; rerender(); },
   'photo-close': () => { delete cur().view; rerender(); },
   'photo-del': (id, a) => arm(a, 'Tap again to delete', () => { const d = S.docs.find(x => x.id === cur().id); d.photos = d.photos.filter(p => p !== id); IDB.del(id).catch(() => {}); delete cur().view; save(); rerender(); toast('Photo deleted'); }),
-  'go-home': () => { ppickClose(); ui.stack = [{ p: 'home' }]; render(); window.scrollTo(0, 0); },
+  'go-home': () => { ppickClose(); ui.stack = [{ p: 'home' }]; shell.dir = 'back'; render(); window.scrollTo(0, 0); },
   'ppick-open': (hid, a) => {
     const dd = a.parentElement.querySelector('.ppick-dd'), open = dd.hidden; ppickClose();
     if (!open) return;
@@ -3014,7 +3296,34 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && ui.stack.length > 1 && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) back(); });
 
+/* ---------- install as an app (PWA) ---------- */
+let installEvt = null;
+const isStandalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+function installRow() {
+  if (isStandalone()) return '';
+  if (installEvt) return `<button class="install" data-act="install"><span class="ic">${ICON.install}</span><span><b>Install Uravu</b><small>Opens like an app. Works offline.</small></span></button>`;
+  if (isIOS()) return `<div class="install"><span class="ic">${ICON.install}</span><span><b>Install Uravu</b><small>Tap Share, then “Add to Home Screen”</small></span></div>`;
+  return '';
+}
+async function installApp() {
+  if (!installEvt) return;
+  const ev = installEvt; installEvt = null; ev.prompt();
+  try { await ev.userChoice; } catch (e) {}
+  rerender();
+}
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; if (['home', 'settings'].includes(cur().p)) rerender(); });
+window.addEventListener('appinstalled', () => { installEvt = null; toast('Uravu installed'); });
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+}
+
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+histDepth = history.state && typeof history.state.d === 'number' ? history.state.d : 0;
+if (!history.state) history.replaceState({ d: 0 }, '');
 load();
+// app-icon shortcuts open a tab directly, e.g. ./#people
+{ const h = location.hash.slice(1); if (TABS.some(t => t[0] === h)) { ui.stack = [{ p: h }]; history.replaceState(history.state, '', location.pathname + location.search); } }
 render();
 </script>
 </body>
