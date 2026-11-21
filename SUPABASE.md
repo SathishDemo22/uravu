@@ -101,7 +101,7 @@ Go to **Project Settings › API** (or **API Keys**) and copy:
 npm start
 ```
 
-Open `http://localhost:8080`, then **Settings › Sign in to sync**. Create an account, then choose **Upload this device's data**. Open the address in a second browser (or a private window), sign in to the same account, and choose **Use my account's data on this device**. Edits on one now appear on the other after a sync. Use **Sync now** on the Account page, or wait a few seconds.
+Open `http://localhost:8080`. With `config.js` filled in, Uravu opens to its sign-in screen. Create an account (or sign in), and your family opens. Open the same address in a second browser or a private window and sign in to the same account: a change in one appears in the other within a second or two.
 
 ## 10. Deploy
 
@@ -110,22 +110,18 @@ Open `http://localhost:8080`, then **Settings › Sign in to sync**. Create an a
 3. Push. GitHub Pages or Vercel publishes it, as described in the README.
 4. Make sure the published address is in **Site URL / Redirect URLs** (step 4).
 
-## Moving your real data in (do this once, carefully)
+## Old copies from the earlier version
 
-Your real people are in the browser where you entered them. Do these steps **in that same browser**, on the same address (same host and port):
+The earlier version kept a copy on each device. The first time the online version opens on such a device, after you sign in it checks that copy against your account. It lists anything only the old copy has and offers **Add to my account**, **Download the old copy as a file**, and **Remove the old copy from this device**. Nothing on the device is removed until you tap Remove twice.
 
-1. **Settings › Save a backup file** first, and keep the file safe.
-2. **Settings › Sign in to sync** → create your account.
-3. Choose **Upload this device's data**. Your account starts empty, so nothing is replaced.
-4. **Account › Document vault:** choose a vault PIN and write it down somewhere safe. Your documents upload only after this step, encrypted.
-5. On your other devices, sign in and choose **Use my account's data on this device**. That device saves a backup file of whatever it had before taking the account's data.
+## How it works (for reference)
 
-## How the sync works (for reference)
-
-- The device is the main copy. The app still saves to `localStorage` (`uravu.v1`) exactly as before, so all the offline features keep working.
-- When signed in, a sync compares the data with what was last synced. It does this about a second after each change, on opening, when the internet comes back, when the app comes back to the screen, and every 2 minutes. Changed rows are pushed, and rows changed on other devices are pulled.
-- **Live updates:** each signed-in device listens to Supabase Realtime for changes to its own user's rows (RLS applies). When another device saves something, this device pulls it in within a second or two. If the live connection drops (for example, a phone in the background), the app catches up as soon as it's back on screen.
+- **Online only, sign-in required.** With `config.js` filled in, the app opens to a sign-in screen. Your family is loaded from your account into memory and every change is saved straight back to it. Nothing about your family is written to the device: no `localStorage` data, no on-device photo store.
+- The device remembers only the sign-in (Supabase's session, `uravu.auth`) and, once entered, the vault key (in IndexedDB `uravu-sync`, as a key the browser won't let anyone read out).
+- **Offline:** you can look at what's already open, but changes can't be saved. An orange strip says so, and any change is undone with a message. Opening the app with no internet shows an offline screen that retries by itself.
+- **Saving:** about half a second after each change, the app compares the data with what the account has and sends the difference. It also checks on opening, when the internet comes back, when the app comes back to the screen, and every 2 minutes.
+- **Live updates:** each signed-in device listens to Supabase Realtime for changes to its own user's rows (RLS applies). When another device saves something, this device pulls it in within a second or two.
 - Each row has `owner_id, id, data, updated_at, deleted, server_at`. The newest `updated_at` wins, and the database itself refuses an older edit (the `uravu_touch` trigger). Deleting something sets `deleted = true` and blanks its details.
-- Sync bookkeeping (what was last synced, edits waiting to go up, vault data waiting for a PIN) is kept in IndexedDB (`uravu-sync`). Edits made offline wait there safely until the next sync.
-- **Vault:** document numbers, notes, names, file names, and every photo and PDF are encrypted on the device with AES-256-GCM. The key comes from the vault PIN (PBKDF2-SHA256, 600,000 rounds, random salt). Only the encrypted text (`docs.secret`, `doc_terms.secret`) and encrypted files reach Supabase. A forgotten PIN can't be recovered.
+- **Vault:** document numbers, notes, names, file names, and every photo and PDF are encrypted on the device with AES-256-GCM before they're saved. The key comes from the vault PIN (PBKDF2-SHA256, 600,000 rounds, random salt). Files are fetched with one-minute signed links and opened in memory only. A forgotten PIN can't be recovered.
+- Without `config.js` values (as in the automatic tests), the app works the old way, on the device only.
 - **Not yet supported:** changing the vault PIN.

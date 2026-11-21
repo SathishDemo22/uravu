@@ -14,6 +14,7 @@ function entryOk(c) {
   return true;
 }
 function render() {
+  if (cloudGate()) return;   // online only: sign in / loading / offline screen until the account's data is here
   // each tab remembers its own pages; ui.stack is the open tab's list
   ui.tabs = ui.tabs || {};
   if (TAB_IDS.includes(ui.stack[0].p)) ui.tabs[ui.stack[0].p] = ui.stack;
@@ -466,7 +467,10 @@ const H = {
   backup: () => doBackup(),
   'restore-no': () => { delete cur().restore; rerender(); },
   'restore-yes': () => {
-    const ph = cur().restore.photos || {}; Object.entries(ph).forEach(([k, v]) => IDB.put(k, v).catch(() => {}));
+    const ph = cur().restore.photos || {};
+    if (cloudConfigured() && Object.keys(ph).length && !cloud.key) { toast('This backup has document files. Enter your vault PIN first (Account › Document vault).'); return; }
+    if (readOnly()) { toast('You’re offline. Restore when you’re back online.'); return; }
+    Object.entries(ph).forEach(([k, v]) => IDB.put(k, v).catch(() => {}));
     S = cur().restore.data; normalize(); save();
     ui = { stack: [{ p: 'home' }], q: '' }; render(); window.scrollTo(0, 0); toast(`Restored ${Object.keys(S.people).length} people`);
   },
@@ -566,6 +570,8 @@ const H = {
   'my-gender': id => { S.people[S.me].gender = id; save(); render(); toast('Saved'); },
   'reset-demo': (id, a) => arm(a, 'Tap again to replace everything', () => { S = demo(); save(); ui = { stack: [{ p: 'home' }], q: '' }; render(); toast('Sample family loaded'); }),
   'clear-all': (id, a) => arm(a, 'Tap again to clear everything', () => {
+    if (readOnly()) { toast('You’re offline. Try again when you’re back online.'); return; }
+    (S.docs || []).forEach(d => (d.photos || []).forEach(p => IDB.del(p).catch(() => {})));   // the document files go too
     const me = S.people[S.me];
     S = { me:'me', people:{ me: blankPerson('me', { name: me.name, tamilName: me.tamilName, gender: me.gender, photo: me.photo }) }, edges:[], events:[], settings:S.settings };
     save(); ui = { stack: [{ p: 'home' }], q: '' }; render(); toast('Cleared. Start adding people.');

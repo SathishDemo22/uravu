@@ -11,13 +11,13 @@ function pgSettings(c) {
     <div class="fld"><span>I am <span class="hint">Some Tamil words depend on this, like Machan</span></span><div class="seg">${sb('my-gender', 'm', 'Male', me.gender)}${sb('my-gender', 'f', 'Female', me.gender)}</div></div>
     <div class="fld"><span>Gender</span><button class="plain-btn" data-act="go" data-id="genders" style="margin-top:0">Update gender for everyone${noGender().length ? ` (${noGender().length} not set)` : ''}</button></div>
     <div class="fld"><span>Alive or passed away</span><button class="plain-btn" data-act="go" data-id="living" style="margin-top:0">Mark who has passed away${deadPeople().length ? ` (${deadPeople().length} marked)` : ''}</button></div>
-    <div class="fld"><span>Backup <span class="hint">${cloud.user ? 'Also synced to your account. A backup file is still a good extra copy.' : 'Your people are saved only in this browser. Keep a backup file somewhere safe, like Google Drive or WhatsApp to yourself.'}${S.settings.lastBackup ? ' Last backup: ' + fmtDate(S.settings.lastBackup.slice(0, 10)) + '.' : ' No backup yet.'}</span></span>
-      ${c.restore ? `<div class="pov-note" style="margin:4px 0 0">Restore <b>${c.restore.count} people</b>${c.restore.savedAt ? ` from the backup of ${esc(fmtDate(c.restore.savedAt.slice(0, 10)))}` : ''}? This replaces everything saved here now${cloud.user ? ', and in your account on all your devices' : ''}.
+    <div class="fld"><span>Backup <span class="hint">${cloud.user ? 'Everything is saved in your account. A backup file is a good extra copy; it isn’t encrypted, so keep it somewhere safe.' : 'Your people are saved only in this browser. Keep a backup file somewhere safe, like Google Drive or WhatsApp to yourself.'}${S.settings.lastBackup ? ' Last backup: ' + fmtDate(S.settings.lastBackup.slice(0, 10)) + '.' : ' No backup yet.'}</span></span>
+      ${c.restore ? `<div class="pov-note" style="margin:4px 0 0">Restore <b>${c.restore.count} people</b>${c.restore.savedAt ? ` from the backup of ${esc(fmtDate(c.restore.savedAt.slice(0, 10)))}` : ''}? This replaces everything ${cloud.user ? 'in your account, on all your devices' : 'saved here now'}.
         <div class="qbtns"><button class="btn-s p" data-act="restore-yes">Restore</button><button class="btn-s" data-act="restore-no">Cancel</button></div></div>`
       : `<button class="plain-btn" data-act="backup" style="margin-top:0">Save a backup file</button>
       <label class="plain-btn" style="display:grid;place-items:center;cursor:pointer">Restore from a backup file<input type="file" id="restoreIn" accept=".json,application/json" hidden></label>`}</div>
-    <div class="fld"><span>Start over <span class="hint">Both options replace what’s saved on this phone${cloud.user ? ', and in your account on all your devices' : ''}</span></span>
-      <button class="plain-btn" data-act="reset-demo">Load the sample family</button>
+    <div class="fld"><span>Start over <span class="hint">${cloud.user ? 'Deletes everything in your account, on all your devices' : 'Both options replace what’s saved on this phone'}</span></span>
+      ${cloud.user ? '' : '<button class="plain-btn" data-act="reset-demo">Load the sample family</button>'}
       <button class="plain-btn danger" data-act="clear-all">Start with an empty list</button></div>`;
 }
 
@@ -399,7 +399,7 @@ function readDocPhoto(file) {
       const d = S.docs.find(x => x.id === docId); d.photos = [...(d.photos || []), pid];
       d.fileMeta = Object.assign({}, d.fileMeta, { [pid]: meta });
       save(); if (cur().id === docId) rerender(); toast(meta.kind === 'pdf' ? 'PDF saved on this device' : 'Photo saved on this device');
-    } catch (e) { toast('Files can’t be saved in this browser.'); }
+    } catch (e) { toast(e && e.uravu ? e.message : 'Files can’t be saved in this browser.'); }
   };
   r.onload = () => {
     if (isPdf) { keep(r.result, { kind: 'pdf', name: file.name || 'document.pdf', size: file.size }); return; }
@@ -472,7 +472,7 @@ function pgDocs(c) {
       : !list.length ? `<p class="empty">Nothing here.</p>`
       : groups.map(([o, ds]) => `${o ? `<p class="subh" style="margin:14px 0 2px">${esc(o === S.me ? 'You' : S.people[o].name)}</p>` : ''}<div class="rows">${ds.map(d => docRow(d, !o)).join('')}</div>`).join('')}
     <button class="btn-p" data-act="doc-new" data-id="" style="margin-top:18px">＋ Add a document</button>
-    <p class="hint-line" style="margin-top:18px;font-size:.84rem">${cloud.user ? (cloud.key ? 'Synced to your account, locked with your vault PIN before upload.' : 'On this phone. Set or enter your vault PIN in Settings › Account to back them up, locked.') : 'Saved only on this phone, and included in your backup file.'} For Aadhaar, the last 4 digits are enough.</p>`;
+    <p class="hint-line" style="margin-top:18px;font-size:.84rem">${cloud.user ? (cloud.key ? 'Saved in your account, locked with your vault PIN.' : 'Set or enter your vault PIN in Settings › Account to save documents.') : 'Saved only on this phone, and included in your backup file.'} For Aadhaar, the last 4 digits are enough.</p>`;
 }
 function fieldRows(defs, f, reveal) {
   return defs.filter(([k]) => f[k] !== undefined && f[k] !== '').map(([k, label, kind]) => {
@@ -507,7 +507,7 @@ function pgDoc(c) {
         ? `<button class="thumb pdf" data-act="photo-view" data-id="${esc(pid)}" aria-label="Open PDF ${esc((d.fileMeta[pid] || {}).name || '')}"><span class="pdfic">PDF</span><small>${esc((d.fileMeta[pid] || {}).name || 'document.pdf')}</small></button>`
         : `<button class="thumb" data-act="photo-view" data-id="${esc(pid)}" aria-label="Open photo"><img data-photo="${esc(pid)}" alt=""></button>`).join('')}</div>` : '<p class="muted" style="margin:0 0 6px">Add a photo of the card, or the policy PDF, so you have it handy.</p>'}
       <label class="link-btn" style="display:inline-block;cursor:pointer">＋ Add photo or PDF<input type="file" accept="image/*,application/pdf,.pdf" id="docPhotoIn" multiple hidden></label>
-      <p class="hint-line" style="margin:6px 0 0;font-size:.82rem">${cloud.user && cloud.key ? 'Locked with your vault PIN before upload, and included in your backup.' : 'Files stay on this device only, and are included in your backup.'}</p></section>
+      <p class="hint-line" style="margin:6px 0 0;font-size:.82rem">${cloud.user ? 'Locked with your vault PIN and saved in your account.' : 'Files stay on this device only, and are included in your backup.'}</p></section>
     <button class="danger-txt" data-act="doc-del" data-id="${esc(d.id)}">Delete this document</button>${viewer}`;
 }
 function docInput(prefix, [k, label, kind = 'text', ph = ''], val) {

@@ -496,7 +496,7 @@ await test('Dark mode keeps working', async () => {
 const FAKE_PORT = 8766, fake = startFakeCloud(FAKE_PORT), FAKE_URL = `http://127.0.0.1:${FAKE_PORT}/`;
 const EMAIL = 'family@example.com', PASS = 'correct-horse-9', PIN = '246810';
 
-await test('Cloud sync switched off: no account row, app works as before', async () => {
+await test('Accounts switched off: no sign-in, app works on the device as before', async () => {
   await fresh(); await click('.me-btn');
   ok(await ev(`return !document.querySelector('.prof.acct') && cloud.status === 'off'`), 'no account row without config');
 });
@@ -560,111 +560,122 @@ let B = null, UID = '';
 const live = t => fake.rowsOf(UID, t).filter(r => !r.deleted);
 const cloudOk = fn => async () => { if (!UID) throw new Error('skipped: sign-up failed'); await fn(); };
 
-await test('Sign up; the first sync uploads this phone’s data (documents wait for the vault PIN)', async () => {
+const signInUI = async (d, email, pass, act = 'acct-signin') => { await d.ev(`$('#acEmail').value = ${JSON.stringify(email)}; $('#acPass').value = ${JSON.stringify(pass)};`); await d.click(`[data-act="${act}"]`); };
+// Nothing about the family may be stored in the browser: no app data in localStorage, no on-device photo store
+const deviceHolds = d => d.ev(`const names = indexedDB.databases ? (await indexedDB.databases()).map(x => x.name) : [];
+  const ls = Object.keys(localStorage).filter(k => !/^(fake\\.session|uravu\\.auth)/.test(k));
+  let st = []; if (names.includes('uravu-sync')) { st = await new Promise(res => { const r = indexedDB.open('uravu-sync'); r.onsuccess = () => { const keys = r.result.transaction('kv').objectStore('kv').getAllKeys(); keys.onsuccess = () => res(keys.result.filter(k => !String(k).startsWith('key:'))); }; r.onerror = () => res(['?']); }); }
+  return { ls, photoDb: names.includes('uravu'), sync: st };`);
+
+await test('Online only: the app opens to sign-in, with nothing usable before signing in', async () => {
   await A.go(BASE);
-  eq(await A.ev('return cloud.status'), 'signedout', 'status before signing in');
-  await A.click('.me-btn'); await A.click('.prof.acct');
-  eq((await A.page()).p, 'account', 'account page'); await A.shot('20-sign-in');
-  await A.ev(`$('#acEmail').value = 'nope'; $('#acPass').value = 'short';`); await A.click('[data-act="acct-signup"]');
+  await A.waitFor(`return cloud.phase === 'signin' && !!$('#acEmail')`);
+  ok(await A.ev(`return $('#tabbar').hidden && $('#fab').hidden && !S.people.appa`), 'no tabs, no sample family');
+  await A.shot('20-sign-in');
+  await signInUI(A, 'nope', 'short', 'acct-signup');
   eq(await A.ev(`return $('#acErr').textContent`), 'Enter your email address.', 'checks the email');
-  await A.ev(`$('#acEmail').value = ${JSON.stringify(EMAIL)}; $('#acPass').value = ${JSON.stringify(PASS)};`);
-  await A.click('[data-act="acct-signup"]');
-  await A.waitFor(`return cur().p === 'cloudsetup' && cloud.cloudPeople === 0`);
-  await A.shot('21-first-sync');
+  await signInUI(A, EMAIL, PASS, 'acct-signup');
+  await A.waitFor(`return cloud.phase === 'ready' && cur().p === 'home'`);
   UID = fake.uidOf(EMAIL); ok(UID, 'account made');
-  const local = await A.ev(`return { people: Object.keys(S.people).length, edges: S.edges.length, docs: S.docs.length, events: S.events.length,
-    likes: Object.values(S.people).reduce((a, p) => a + new Set(p.likes.map(l => l.cat + '|' + l.val)).size, 0), guests: S.funcs.reduce((a, f) => a + f.guests.length, 0) }`);
-  await A.click('[data-act="acct-start-upload"]');
-  await A.waitFor(`return cloud.status === 'synced' && cur().p !== 'cloudsetup'`);
-  eq([live('people').length, live('links').length, live('likes').length, live('events').length, live('functions').length, live('guests').length, live('settings').length],
-    [local.people, local.edges, local.likes, local.events, 1, local.guests, 1], 'rows uploaded (people, links, likes, events, functions, guests, settings)');
-  eq(live('docs').length, 0, 'documents not uploaded before a vault PIN');
-  ok(live('people').every(r => r.owner_id === UID && r.updated_at && r.deleted === false), 'rows carry owner, time and soft-delete flag');
-  ok((await A.ev('return cloudStatusText()')).includes('vault PIN'), 'status says documents wait for a vault PIN');
-  await A.ev(`ui.stack = [{ p: 'home' }]; render();`);
-  eq(await A.ev(`return $('.me-btn .cdot').dataset.cloudDot`), 'warn', 'dot on the profile button');
+  eq(await A.ev('return [Object.keys(S.people).length, S.people[S.me].name]'), [1, 'Family'], 'a new account starts with just you');
+  await A.waitFor(`return cloud.status === 'synced'`);
+  eq([live('people').length, live('settings').length], [1, 1], 'saved to the account');
+  ok(await A.ev(`return !$('#tabbar').hidden`), 'app open');
 });
 
-await test('Second phone signs in and takes the account’s data; edits go both ways', cloudOk(async () => {
-  B = await newDevice(fakeApiScript(FAKE_URL), 'phone 2');
-  await B.go(BASE);
-  await B.ev(`S.people.zz = blankPerson('zz', { name: 'Only on phone 2' }); save();`);
-  await B.ev(`push('account', {})`);
-  await B.ev(`$('#acEmail').value = ${JSON.stringify(EMAIL)}; $('#acPass').value = 'wrong-password';`); await B.click('[data-act="acct-signin"]');
-  eq(await B.ev(`return $('#acErr').textContent`), 'Wrong email or password.', 'wrong password');
-  await B.ev(`$('#acPass').value = ${JSON.stringify(PASS)};`); await B.click('[data-act="acct-signin"]');
-  await B.waitFor(`return cur().p === 'cloudsetup' && cloud.cloudPeople > 0`);
-  await B.ev(`const b = $('[data-act="acct-start-replace"]'); b.click(); b.click();`);   // tap twice to confirm
-  await B.waitFor(`return cloud.status === 'synced' && cur().p !== 'cloudsetup'`, 15000);
-  eq(await B.ev('return Object.keys(S.people).sort()'), await A.ev('return Object.keys(S.people).sort()'), 'phone 2 has the account’s people');
-  ok(!(await B.ev('return !!S.people.zz')), 'phone 2’s own data was replaced');
-  ok(downloads.some(d => /^uravu-backup-/.test(d.name)), 'a backup of phone 2 was saved first');
-  // phone 2 -> phone 1
-  await B.ev(`S.people.bnew = blankPerson('bnew', { name: 'Added on phone 2', circle: 'friend' }); save();`);
-  eq(await B.sync(), 'synced', 'phone 2 synced'); await A.sync();
-  eq(await A.ev('return S.people.bnew && S.people.bnew.name'), 'Added on phone 2', 'phone 1 got the new person');
-  // phone 1 -> phone 2, including a like and a guest
-  await A.ev(`S.people.appa.phone = '9000000001'; S.people.appa.likes.push({ cat: 'Sweets', val: 'Mysore pak' }); S.funcs[0].guests[0].rsvp = 'maybe'; save();`);
-  await A.sync(); await B.sync();
-  eq(await B.ev('return [S.people.appa.phone, S.people.appa.likes.some(l => l.val === "Mysore pak"), S.funcs[0].guests[0].rsvp]'), ['9000000001', true, 'maybe'], 'phone 2 got the edits');
+await test('Every change goes straight to the account; nothing about the family is kept on the device', cloudOk(async () => {
+  await A.ev(`S.people.p1 = blankPerson('p1', { name: 'Kumar', gender: 'm', likes: [{ cat: 'Food', val: 'Dosa' }] });
+    S.edges.push({ id: uid(), type: 'parent', child: S.me, parent: 'p1' });
+    S.events.push({ id: 'e1', title: 'Kumar’s retirement', type: 'milestone', on: '2020-05-01', yearly: true, people: ['p1'], remind: 3, note: '' });
+    S.funcs.push({ id: 'f1', title: 'Housewarming', kind: 'Housewarming', on: '', venue: '', msg: '', guests: [{ id: 'g1', pid: 'p1', invited: true }] });
+    S.given.push({ id: 'gv1', pid: 'p1', title: 'Wedding', amount: '1001', on: '' }); save();`);
+  await A.waitFor(`return cloud.status === 'synced' && cloud.pending === 0 && !!S.people.p1`);
+  await sleep(300);
+  eq([live('people').length, live('likes').length, live('links').length, live('events').length, live('functions').length, live('guests').length, live('gifts').length],
+    [2, 1, 1, 1, 1, 1, 1], 'rows saved (people, likes, links, events, functions, guests, gifts)');
+  ok(live('people').every(r => r.owner_id === UID && r.updated_at && r.deleted === false), 'rows carry owner, time and soft-delete flag');
+  eq(await deviceHolds(A), { ls: [], photoDb: false, sync: [] }, 'nothing stored in the browser');
 }));
 
-await test('Live: a person added on one phone appears on the other by itself (no Sync now)', cloudOk(async () => {
+await test('Second phone signs in, sees the same family, and changes appear live both ways', cloudOk(async () => {
+  B = await newDevice(fakeApiScript(FAKE_URL), 'phone 2');
+  await B.go(BASE);
+  await B.waitFor(`return cloud.phase === 'signin'`);
+  await signInUI(B, EMAIL, 'wrong-password');
+  eq(await B.ev(`return $('#acErr').textContent`), 'Wrong email or password.', 'wrong password');
+  await signInUI(B, EMAIL, PASS);
+  await B.waitFor(`return cloud.phase === 'ready'`);
+  eq(await B.ev('return Object.keys(S.people).sort()'), await A.ev('return Object.keys(S.people).sort()'), 'same people');
   await A.waitFor('return cloud.live', 8000); await B.waitFor('return cloud.live', 8000);
   ok((await A.ev('return cloudStatusText()')).includes('Live'), 'status says live');
   await A.ev(`ui.stack = [{ p: 'people' }]; render();`);
   await B.ev(`S.people.live1 = blankPerson('live1', { name: 'Live Kumar', circle: 'friend' }); save();`);
-  await A.waitFor(`return !!S.people.live1`, 8000);   // nobody pressed Sync now
+  await A.waitFor(`return !!S.people.live1`, 8000);   // nobody pressed anything
   await A.waitFor(`return document.querySelector('#app').textContent.includes('Live Kumar')`, 3000);
-  await A.ev(`S.people.live1.phone = '9000000002'; save();`);
-  await B.waitFor(`return S.people.live1 && S.people.live1.phone === '9000000002'`, 8000);
+  await A.ev(`S.people.live1.phone = '9000000002'; S.funcs[0].guests[0].rsvp = 'maybe'; save();`);
+  await B.waitFor(`return S.people.live1 && S.people.live1.phone === '9000000002' && S.funcs[0].guests[0].rsvp === 'maybe'`, 8000);
 }));
 
-await test('Offline edits stay on the phone and go up when it’s back online', cloudOk(async () => {
+await test('Offline: you can look but not change; back online it works again', cloudOk(async () => {
   await A.offline(true);
-  await A.ev(`S.people.amma.notes = 'Written offline'; save();`);
-  eq(await A.sync(), 'offline', 'status offline');
-  ok((await A.ev('return cloudStatusText()')).startsWith('Offline'), 'offline message');
-  ok(await A.ev(`return JSON.parse(localStorage.getItem('uravu.v1')).people.amma.notes === 'Written offline'`), 'saved on the phone');
-  ok(await A.ev(`const st = await SDB.get('state:' + cloud.user.uid); return st.rows['people|amma'].p === 1`), 'remembered as waiting to send');
+  await A.waitFor(`return document.body.classList.contains('read-only') && !$('#roBar').hidden`);
+  await A.ev(`ui.stack = [{ p: 'people' }]; render();`);
+  ok(await A.ev(`return document.querySelector('#app').textContent.includes('Kumar')`), 'still shows the family');
+  await A.ev(`S.people.p1.notes = 'Written offline'; save();`); await sleep(100);
+  eq(await A.ev('return S.people.p1.notes'), '', 'the change was undone');
+  ok((await A.ev(`return $('#toast').textContent`)).includes('offline'), 'says why');
+  await A.shot('23-offline-read-only');
   await A.offline(false);
-  await A.waitFor(`return cloud.status === 'synced'`, 10000);   // coming back online syncs by itself
-  await B.sync(); eq(await B.ev('return S.people.amma.notes'), 'Written offline', 'phone 2 got it');
+  await A.waitFor(`return cloud.status === 'synced' && !document.body.classList.contains('read-only')`, 10000);
+  await A.ev(`S.people.p1.notes = 'Written online'; save();`);
+  await B.waitFor(`return S.people.p1.notes === 'Written online'`, 8000);
+  // opening with no internet: an offline screen, then the family once back online
+  await B.offline(true); await B.ev('loadAccount()');
+  await B.waitFor(`return cloud.phase === 'offline' && document.querySelector('#app').textContent.includes('You’re offline')`);
+  await B.offline(false);
+  await B.waitFor(`return cloud.phase === 'ready' && !!S.people.p1`, 10000);
 }));
 
 await test('Same person edited on both phones: the newest edit wins', cloudOk(async () => {
-  await A.ev(`S.people.periyappa.notes = 'Edited on phone 1'; save();`); await sleep(700);
-  await B.ev(`S.people.periyappa.notes = 'Edited on phone 2, later'; save();`); await sleep(700);
-  await B.sync(); await A.sync(); await B.sync();   // the older edit is sent last, and still loses
-  eq(await A.ev('return S.people.periyappa.notes'), 'Edited on phone 2, later', 'phone 1');
-  eq(await B.ev('return S.people.periyappa.notes'), 'Edited on phone 2, later', 'phone 2');
+  await A.ev(`S.people.p1.nickname = 'Edited on phone 1'; save();`); await sleep(300);
+  await B.ev(`S.people.p1.nickname = 'Edited on phone 2, later'; save();`);
+  await sleep(2500); await A.sync(); await B.sync();
+  eq(await A.ev('return S.people.p1.nickname'), 'Edited on phone 2, later', 'phone 1');
+  eq(await B.ev('return S.people.p1.nickname'), 'Edited on phone 2, later', 'phone 2');
 }));
 
 await test('Delete on one phone removes it on the other (soft delete)', cloudOk(async () => {
-  await B.ev(`delete S.people.joseph; save();`); await B.sync(); await A.sync();
-  ok(!(await A.ev('return !!S.people.joseph')), 'gone on phone 1');
-  const row = fake.rowsOf(UID, 'people').find(r => r.id === 'joseph');
+  await B.ev(`delete S.people.live1; save();`);
+  await A.waitFor(`return !S.people.live1`, 8000);
+  const row = fake.rowsOf(UID, 'people').find(r => r.id === 'live1');
   eq([row.deleted, JSON.stringify(row.data)], [true, '{}'], 'row kept as deleted, with its details removed');
 }));
 
-await test('Restoring a backup while signed in makes the account match it', cloudOk(async () => {
+await test('Restoring a backup makes the account match it', cloudOk(async () => {
   await A.ev(`ui.stack = [{ p: 'home' }, { p: 'settings' }]; render();`);
   const n0 = downloads.length; await A.click('[data-act="backup"]');
   let f = null; for (let t = 0; t < 8000 && !f; t += 100) { f = downloads.slice(n0).find(d => /^uravu-backup-/.test(d.name) && d.done); if (!f) await sleep(100); }
   ok(f, 'backup saved');
-  await A.ev(`S.people.temp1 = blankPerson('temp1', { name: 'Temporary' }); save();`); await A.sync(); await B.sync();
-  ok(await B.ev('return !!S.people.temp1'), 'phone 2 had the new person');
+  await A.ev(`S.people.temp1 = blankPerson('temp1', { name: 'Temporary' }); save();`);
+  await B.waitFor('return !!S.people.temp1', 8000);
   await A.ev(`ui.stack = [{ p: 'home' }, { p: 'settings' }]; render();`);
   await A.c('DOM.enable'); const { root } = await A.c('DOM.getDocument', { depth: -1, pierce: true });
   const { nodeId } = await A.c('DOM.querySelector', { nodeId: root.nodeId, selector: '#restoreIn' });
   await A.c('DOM.setFileInputFiles', { nodeId, files: [path.join(DL, f.guid)] }); await sleep(500);
-  ok((await A.ev(`return $('.pov-note').textContent`)).includes('in your account'), 'warns that the account changes too');
-  await A.click('[data-act="restore-yes"]'); await A.sync(); await B.sync();
-  ok(!(await B.ev('return !!S.people.temp1')), 'phone 2 matches the backup');
+  ok((await A.ev(`return $('.pov-note').textContent`)).includes('in your account'), 'warns that the account changes');
+  await A.click('[data-act="restore-yes"]');
+  await B.waitFor('return !S.people.temp1', 8000);
   eq(fake.rowsOf(UID, 'people').find(r => r.id === 'temp1').deleted, true, 'deleted in the account');
 }));
 
-await test('Vault: documents and files are encrypted before upload; phone 2 needs the PIN', cloudOk(async () => {
+await test('Vault: documents and files are encrypted before they’re saved; phone 2 needs the PIN', cloudOk(async () => {
+  await A.ev(`S.docs.push({ id: 'd1', type: 'dl', owner: S.me, title: '', f: { number: 'TN5920150001234', to: '2030-01-01' }, remind: 60, photos: [], terms: [] });
+    S.docs.push({ id: 'd2', type: 'vehicle_ins', owner: S.me, title: '', f: { vehicle: 'TN 59 AB 1234' }, remind: 30, photos: [], note: 'Agent: Ramesh', terms: [{ id: 't1', f: { insurer: 'ICICI Lombard', policyNo: '3001/2345/678' } }] }); save();`);
+  await A.sync();
+  eq(live('docs').length, 0, 'documents wait for a vault PIN');
+  ok((await A.ev('return cloudStatusText()')).includes('vault PIN'), 'status says so');
+  const photo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  eq(await A.ev(`try { await IDB.put('early', 'x'); return 'saved'; } catch (e) { return e.message; }`), 'Set or enter your vault PIN first: Settings › Account › Document vault.', 'files need the PIN');
   await A.ev(`ui.stack = [{ p: 'home' }, { p: 'settings' }, { p: 'account' }]; render();`);
   ok(await A.ev(`return vaultState() === 'none' && !!$('#acPin2')`), 'asks for a new vault PIN');
   ok((await A.ev(`return $('.pov-note.warn').textContent`)).includes('can’t be opened'), 'warns about a forgotten PIN');
@@ -673,58 +684,74 @@ await test('Vault: documents and files are encrypted before upload; phone 2 need
   await A.ev(`$('#acKnow').checked = true;`); await A.click('[data-act="acct-vault-create"]');
   await A.waitFor(`return vaultState() === 'open' && cloud.status === 'synced'`, 20000);
   await A.sync();
-  const nd = await A.ev('return S.docs.length'), docs = live('docs');
-  eq(docs.length, nd, 'documents uploaded'); ok(live('doc_terms').length > 0, 'policy years uploaded');
-  ok(docs.every(r => /^v1:/.test(r.secret) && !('f' in r.data) && !('note' in r.data)), 'document details only in the encrypted part');
+  eq([live('docs').length, live('doc_terms').length], [2, 1], 'documents saved');
+  ok(live('docs').every(r => /^v1:/.test(r.secret) && !('f' in r.data) && !('note' in r.data)), 'document details only in the encrypted part');
   const dump = JSON.stringify([...fake.rows.values()]);
-  for (const plain of ['TN5920150001234', '3001/2345/678', '912345678', 'Agent: Ramesh', 'ICICI Lombard']) ok(!dump.includes(plain), 'plain text reached the cloud: ' + plain);
-  const photo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
-  await A.ev(`await IDB.put('vph1', ${JSON.stringify(photo)}); S.docs[0].photos = [...(S.docs[0].photos || []), 'vph1']; save();`); await A.sync();
-  const fb = fake.files.get(UID + '/vph1'); ok(fb, 'file uploaded');
+  for (const plain of ['TN5920150001234', '3001/2345/678', 'Agent: Ramesh', 'ICICI Lombard']) ok(!dump.includes(plain), 'plain text reached the cloud: ' + plain);
+  await A.ev(`await IDB.put('vph1', ${JSON.stringify(photo)}); S.docs[0].photos = ['vph1']; save();`); await A.sync();
+  const fb = fake.files.get(UID + '/vph1'); ok(fb, 'file saved to the account');
   ok(!Buffer.from(fb, 'base64').toString('latin1').includes('data:image'), 'file is encrypted');
+  eq((await deviceHolds(A)).photoDb, false, 'no file stored on the device');
   await sleep(200); await A.shot('22-account-vault');
   // phone 2: documents stay locked until the PIN
-  await B.sync();
-  ok(await B.ev(`return S.docs.length === 0 && cloud.lockedN > 0 && vaultState() === 'locked'`), 'phone 2: documents locked');
+  await B.waitFor(`return cloud.lockedN > 0 && vaultState() === 'locked' && S.docs.length === 0`, 8000);
   await B.ev(`ui.stack = [{ p: 'home' }, { p: 'settings' }, { p: 'account' }]; render();`);
   await B.ev(`$('#acPin').value = '111111'; $('[data-act="acct-vault-unlock"]').click();`);
   await B.waitFor(`return !$('#acVErr').hidden`, 15000);
   eq(await B.ev(`return $('#acVErr').textContent`), 'That PIN is wrong.', 'wrong PIN refused');
   await B.ev(`$('#acPin').value = ${JSON.stringify(PIN)}; $('[data-act="acct-vault-unlock"]').click();`);
-  await B.waitFor(`return vaultState() === 'open' && S.docs.length > 0 && cloud.lockedN === 0 && cloud.status === 'synced'`, 20000);
-  await B.sync();
+  await B.waitFor(`return vaultState() === 'open' && S.docs.length === 2 && cloud.lockedN === 0`, 20000);
   eq(await B.ev(`return S.docs.find(d => d.type === 'dl').f.number`), 'TN5920150001234', 'phone 2 reads the licence number');
-  eq(await B.ev(`return await IDB.get('vph1')`), photo, 'phone 2 opened the photo');
+  eq(await B.ev(`return await IDB.get('vph1')`), photo, 'phone 2 opens the photo from the account');
   // deleting the photo removes the file
-  await A.ev(`S.docs[0].photos = S.docs[0].photos.filter(p => p !== 'vph1'); save();`); await A.sync();
-  ok(!fake.files.has(UID + '/vph1'), 'file removed from the cloud');
+  await A.ev(`S.docs[0].photos = []; await IDB.del('vph1'); save();`); await A.sync();
+  ok(!fake.files.has(UID + '/vph1'), 'file removed from the account');
 }));
 
-await test('Sign out keeps the phone’s data', cloudOk(async () => {
-  const n = await B.ev('return Object.keys(S.people).length');
+await test('An old copy saved on a device is checked, added to the account, then removed', cloudOk(async () => {
+  const C = await newDevice(fakeApiScript(FAKE_URL), 'phone 3');
+  await C.go(BASE + 'serve-404');
+  await C.ev(`localStorage.setItem('uravu.v1', JSON.stringify({ me: 'me', settings: { lang: 'both' }, edges: [], events: [], docs: [], funcs: [],
+    people: { me: { id: 'me', name: 'Family', likes: [] }, p1: { id: 'p1', name: 'Kumar', likes: [] }, old1: { id: 'old1', name: 'Only In The Old Copy', likes: [] } } }));`);
+  await C.go(BASE);
+  await C.waitFor(`return cloud.phase === 'signin'`);
+  await signInUI(C, EMAIL, PASS);
+  await C.waitFor(`return cur().p === 'oldcopy' && !!cloud.old`, 10000);
+  eq(await C.ev('return cloud.old.missing'), ['people|old1'], 'finds what only the old copy has');
+  ok((await C.ev(`return document.querySelector('#app').textContent`)).includes('Only In The Old Copy'), 'names it');
+  await C.shot('24-old-copy');
+  await C.click('[data-act="old-add"]');
+  await C.waitFor(`return cloud.old && cloud.old.missing.length === 0`, 8000);
+  ok(live('people').some(r => r.id === 'old1'), 'added to the account');
+  await A.waitFor('return !!S.people.old1', 8000);
+  await C.ev(`const b = $('[data-act="old-remove"]'); b.click(); b.click();`);
+  await C.waitFor(`return !cloud.old && cur().p !== 'oldcopy'`, 5000);
+  eq(await deviceHolds(C), { ls: [], photoDb: false, sync: [] }, 'nothing left on the device');
+  try { await send('Target.disposeBrowserContext', { browserContextId: C.ctx }); } catch (e) {}
+}));
+
+await test('Sign out: back to sign-in, nothing left in the app', cloudOk(async () => {
   await B.click('[data-act="acct-signout"]');
-  await B.waitFor(`return cloud.status === 'signedout' && !cloud.user`);
-  eq(await B.ev('return Object.keys(S.people).length'), n, 'people still on phone 2');
-  ok((await B.ev(`return document.querySelector('[data-cloud-status]')?.textContent || ''`)).includes('Not signed in'), 'status says signed out');
+  await B.waitFor(`return cloud.phase === 'signin' && !cloud.user`);
+  eq(await B.ev('return [Object.keys(S.people), S.docs.length, cloud.key]'), [['me'], 0, null], 'family gone from memory, vault key forgotten');
+  eq(await deviceHolds(B), { ls: [], photoDb: false, sync: [] }, 'nothing stored in the browser');
 }));
 
 await test('Delete my account removes every row and file', cloudOk(async () => {
   await A.ev(`ui.stack = [{ p: 'home' }, { p: 'settings' }, { p: 'account' }]; render();`);
-  const n = await A.ev('return Object.keys(S.people).length');
   await A.click('[data-act="acct-delete"]');
   await A.ev(`$('#acDel').value = 'nope';`); await A.click('[data-act="acct-delete-go"]');
   eq(await A.ev(`return $('#acDErr').textContent`), 'Type DELETE to confirm.', 'needs DELETE typed');
   await A.ev(`$('#acDel').value = 'DELETE';`); await A.click('[data-act="acct-delete-go"]');
-  await A.waitFor(`return cloud.status === 'signedout' && cur().p === 'settings'`);
+  await A.waitFor(`return cloud.phase === 'signin'`);
   eq([...fake.rows.keys()].filter(k => k.startsWith(UID + '|')).length, 0, 'no rows left');
   eq([...fake.files.keys()].filter(k => k.startsWith(UID + '/')).length, 0, 'no files left');
   ok(!fake.users.has(EMAIL), 'account gone');
-  eq(await A.ev('return Object.keys(S.people).length'), n, 'this phone keeps its copy');
 }));
 
-await test('Real Supabase client: server out of reach, the app still opens and says why', async () => {
+await test('Real Supabase client: server out of reach, sign-in says why', async () => {
   // config.js pointing at an address where nothing answers
-  const C = await newDevice('', 'phone 3', /^TypeError: Failed to fetch/, true);   // supabase-js logs the failed request itself
+  const C = await newDevice('', 'phone 4', /^TypeError: Failed to fetch/, true);   // supabase-js logs the failed request itself
   await C.c('Fetch.enable', { patterns: [{ urlPattern: '*/config.js*' }] });
   listeners.push(m => {
     if (m.method === 'Fetch.requestPaused' && m.sessionId === C.sid)
@@ -732,18 +759,14 @@ await test('Real Supabase client: server out of reach, the app still opens and s
         body: Buffer.from(`window.URAVU_CONFIG = { supabaseUrl: 'http://127.0.0.1:9', supabaseAnonKey: 'test-anon-key', google: true };`).toString('base64') });
   });
   await C.go(BASE + '?code=abc123#/people');
-  await C.waitFor(`return cloud.api && cloud.status !== 'off'`);
-  eq(await C.ev('return [location.search, location.hash, cur().p]'), ['', '#/people', 'people'], 'sign-in code taken off the address, page kept');
+  await C.waitFor(`return cloud.phase === 'signin'`);
+  eq(await C.ev('return location.search'), '', 'sign-in code taken off the address');
   ok(await C.ev(`return typeof window.supabase.createClient === 'function' && !window.__uravuCloudApi`), 'real client loaded from vendor/');
   await C.waitFor(`return $('#toast').textContent.includes('sign-in link')`);
-  eq(await C.ev('return cloud.status'), 'signedout', 'signed out');
-  await C.ev(`push('account', {})`);
-  ok(await C.ev(`return !!$('[data-act="acct-google"]')`), 'Google button when switched on');
-  await C.ev(`$('#acEmail').value = 'someone@example.com'; $('#acPass').value = 'long-enough-pw'; $('[data-act="acct-signin"]').click();`);
+  ok(await C.ev(`return !!$('[data-act="acct-google"]') && $('#tabbar').hidden`), 'sign-in screen with Google, app closed');
+  await signInUI(C, 'someone@example.com', 'long-enough-pw');
   await C.waitFor(`return !$('#acErr').hidden`, 15000);
   eq(await C.ev(`return $('#acErr').textContent`), 'No internet connection. Try again when you’re online.', 'clear message');
-  await C.ev(`S.people.appa.notes = 'still works'; save();`);
-  eq(await C.ev(`return JSON.parse(localStorage.getItem('uravu.v1')).people.appa.notes`), 'still works', 'saving still works');
   try { await send('Target.disposeBrowserContext', { browserContextId: C.ctx }); } catch (e) {}
 });
 
@@ -766,7 +789,12 @@ await test('Works offline after the first visit', async () => {
   ok(await ev(`return !!navigator.serviceWorker.controller`), 'page controlled by the service worker');
   await cdp('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
   await go(BASE);
-  const s = await page(); eq([s.p, s.tabs], ['home', true], 'app opens offline');
+  // The service worker fetches config.js itself (the tests can't swap it there), so this may be the online-only app:
+  // then the right result offline is its sign-in / offline screen; without accounts, the full app.
+  await sleep(600);
+  const s = await page(), gate = await ev(`return cloud.phase`);
+  ok(s.p === 'home' && (s.tabs || ['signin', 'offline'].includes(gate)), `app opens offline (tabs ${s.tabs}, phase ${gate})`);
+  ok(await ev(`return $('#app').textContent.trim().length > 0`), 'something is shown');
   await shot('11-offline');
   await cdp('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
 });

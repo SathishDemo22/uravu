@@ -571,3 +571,13 @@ body.has-tabs:not(.has-fab) .toast{bottom:calc(96px + env(safe-area-inset-bottom
 .pov-note.warn{background:var(--alert-soft)}
 .chk{display:flex;gap:10px;align-items:flex-start;margin-top:12px;font-size:.92rem;cursor:pointer}
 .chk input{width:20px;height:20px;margin-top:2px;flex:none;accent-color:var(--primary)}
+/* sign-in screen (online only) and the offline strip */
+.gate-head{text-align:center;margin:28px 0 18px}
+.gate-head img{width:64px;height:64px;border-radius:16px}
+.gate-head h1{margin:10px 0 2px;font-size:1.6rem}
+.gate-head .ta{color:var(--tamil);font-size:1.3rem}
+.gate-head p{margin:0}
+.gate-msg{text-align:center;margin-top:24px}
+.gate-msg p{margin:4px 0}
+.ro-bar{position:fixed;left:0;right:0;top:0;z-index:20;padding:calc(6px + env(safe-area-inset-top,0px)) 16px 6px;background:#E37400;color:#fff;font-size:.86rem;font-weight:600;text-align:center}
+body.read-only .app{padding-top:34px}
