@@ -6,7 +6,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 const uid = () => 'x' + Math.random().toString(36).slice(2, 10);
 const pad = n => String(n).padStart(2, '0');
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-let S, ui = { stack: [{ p: 'home' }], q: '' }, kc = {}, pendingPhoto = null, pendingLinks = [], pendingRemove = new Set(), pendingClicked = new Set();
+let S, ui = { stack: [{ p: 'home' }], q: '' }, kc = {}, pendingPhoto = null, pendingLinks = [];
 let EGO = null; const ego = () => EGO || S.me;
 const cur = () => ui.stack[ui.stack.length - 1];
 

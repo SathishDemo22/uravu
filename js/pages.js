@@ -4,7 +4,7 @@ function pgSettings(c) {
   const me = S.people[S.me], lang = S.settings.lang;
   const sb = (act, v, l, cur) => `<button data-act="${act}" data-id="${v}" aria-pressed="${cur === v}">${l}</button>`;
   return bar('Settings') + `
-    <button class="prof" data-act="edit" data-id="${esc(S.me)}">${avatar(me)}<span class="tx"><b>${esc(me.name)}</b><span>Edit my profile</span></span></button>
+    <button class="prof" data-act="person" data-id="${esc(S.me)}">${avatar(me)}<span class="tx"><b>${esc(me.name)}</b><span>My profile</span></span></button>
     ${installRow()}
     ${accountRow()}
     <div class="fld"><span>Show relationship names in</span><div class="seg">${sb('lang', 'both', 'Both', lang)}${sb('lang', 'ta', 'தமிழ்', lang)}${sb('lang', 'en', 'English', lang)}</div></div>
@@ -747,7 +747,7 @@ function pgLiving(c) {
   const row = p => `<div class="r gr"><button class="gmain" data-act="person" data-id="${esc(p.id)}" aria-label="Open ${esc(p.name)}’s profile">${avatar(p)}<span class="tx"><span class="t1">${esc(p.name)}</span><span class="t2">${termLine(kinOf(p.id))}</span></span></button>
     <div class="seg sm"><button data-act="set-dead" data-id="${esc(p.id)}" data-v="" aria-pressed="${!p.dead}">Alive</button><button data-act="set-dead" data-id="${esc(p.id)}" data-v="1" aria-pressed="${!!p.dead}">Passed away</button></div></div>`;
   return bar('Alive or passed away') +
-    `<p class="hint-line">Tap Passed away for anyone who is no more. Each change saves straight away. They won\u2019t be suggested as guests for functions. To add the date, open the person and tap Edit.</p>
+    `<p class="hint-line">Tap Passed away for anyone who is no more. Each change saves straight away. They won\u2019t be suggested as guests for functions. To add the date, open the person and tap it under About.</p>
     <div class="chips">${chip('all', 'Everyone')}${chip('dead', `Passed away (${dead.length})`)}</div>
     <div class="rows">${list.length ? list.map(row).join('') : `<p class="empty">${f === 'dead' ? 'No one is marked as passed away.' : 'No people saved yet.'}</p>`}</div>`;
 }

@@ -60,6 +60,60 @@ function qdSave() {
   delete c.qd; save(); rerender();
 }
 
+/* ---------- name, photo and details, changed right on the person page ---------- */
+// Tap the photo to pick a new one (it goes through the adjuster and saves straight away); tap the name to change it.
+function headCard(id, c) {
+  const p = S.people[id], isMe = id === S.me;
+  const photo = `<label class="ph-photo" aria-label="${p.photo ? 'Change photo' : 'Add a photo'}">${avatar(p, 'xl')}<span class="cam">${ICON.camera}</span><input type="file" accept="image/*" id="photoIn" hidden></label>`;
+  if (c.qh) return `<div class="ph">${photo}<div class="qlike ph-edit">
+    <label class="fld" style="margin-top:0">Name<input id="qhName" value="${esc(p.name)}" autocomplete="off" placeholder="Their name"></label>
+    <label class="fld">Name in Tamil <span class="hint">Optional</span><input id="qhTa" value="${esc(p.tamilName)}" class="ta" autocomplete="off"></label>
+    <label class="fld">Nickname <span class="hint">Optional</span><input id="qhNick" value="${esc(p.nickname)}" autocomplete="off"></label>
+    <div class="qbtns"><button class="btn-s p" data-act="qh-save">Save</button><button class="btn-s" data-act="qh-cancel">Cancel</button>${p.photo ? `<button class="btn-s danger" data-act="photo-clear" data-id="${esc(id)}">Remove photo</button>` : ''}</div></div></div>`;
+  return `<div class="ph">${photo}<h2><button class="ph-name" data-act="qh-open" aria-label="Change name: ${esc(p.name)}">${esc(p.name)}${isMe ? ' (you)' : ''}<span class="pen" aria-hidden="true">${ICON.edit}</span></button></h2>${p.dead ? `<div class="alt">${esc(lifeTxt(p))}</div>` : ''}
+      ${p.tamilName || p.nickname ? `<div class="alt">${[p.tamilName ? `<span class="ta">${esc(p.tamilName)}</span>` : '', p.nickname ? `“${esc(p.nickname)}”` : ''].filter(Boolean).join(', ')}</div>` : ''}</div>`;
+}
+function qhSave() {
+  const c = cur(), p = S.people[c.id], name = $('#qhName').value.trim();
+  if (!name) { $('#qhName').focus(); toast('Add a name to save.'); return; }
+  Object.assign(p, { name, tamilName: $('#qhTa').value.trim(), nickname: $('#qhNick').value.trim() });
+  delete c.qh; save(); rerender(); toast('Saved');
+}
+// One detail: shows the value, tap to change it in place
+const QF = {
+  dob: ['Birthday', 'date', ''], dod: ['Date they passed away', 'date', ''], phone: ['Phone', 'tel', 'For call and WhatsApp'],
+  callAs: ['What you call them', 'text', 'Your own word, e.g. சின்ன மாமா'], groups: ['Groups', 'text', 'Separate with commas, like College gang, Office team'],
+};
+function fieldRow(id, c, f) {
+  const p = S.people[id], [label, type, ph] = QF[f];
+  const v = f === 'groups' ? (p.groups || []).join(', ') : p[f] || '';
+  if (c.qf === f) return `<div class="ab-row ed"><label class="ab-l" for="qfIn">${label}</label><div class="qlike" style="margin-top:6px">
+    <input id="qfIn" class="qin${f === 'callAs' ? ' ta' : ''}" type="${type}" value="${esc(v)}" placeholder="${esc(ph)}" autocomplete="off">
+    <div class="qbtns"><button class="btn-s p" data-act="qf-save">Save</button><button class="btn-s" data-act="qf-cancel">Cancel</button></div></div></div>`;
+  const shown = type === 'date' && v ? fmtDate(v) : v;
+  return `<button class="ab-row" data-act="qf-open" data-id="${f}"><span class="ab-l">${label}</span>${shown ? `<span class="ab-v">${esc(shown)}</span>` : `<span class="ab-v add">＋ Add</span>`}<span class="pen" aria-hidden="true">${ICON.edit}</span></button>`;
+}
+function qfSave() {
+  const c = cur(), p = S.people[c.id], f = c.qf, v = $('#qfIn').value.trim();
+  if (f === 'groups') p.groups = v.split(',').map(x => x.trim()).filter(Boolean); else p[f] = v;
+  delete c.qf; save(); rerender(); toast('Saved');
+}
+function aboutCard(id, c) {
+  const p = S.people[id], isMe = id === S.me;
+  const sb = (act, attrs, on, l) => `<button data-act="${act}" data-id="${esc(id)}" ${attrs} aria-pressed="${on}">${l}</button>`;
+  const segRow = (label, btns) => `<div class="ab-row"><span class="ab-l">${label}</span><div class="seg sm">${btns}</div></div>`;
+  return `<section class="card" id="aboutCard"><h3>About ${isMe ? 'you' : esc(p.name)}</h3>
+    ${segRow('Gender', sb('set-gender', 'data-g="m"', p.gender === 'm', 'Male') + sb('set-gender', 'data-g="f"', p.gender === 'f', 'Female'))}
+    ${isMe ? '' : segRow('Alive or passed away', sb('set-dead', 'data-v=""', !p.dead, 'Alive') + sb('set-dead', 'data-v="1"', !!p.dead, 'Passed away'))}
+    ${p.dead ? fieldRow(id, c, 'dod') : ''}
+    ${fieldRow(id, c, 'dob')}
+    ${fieldRow(id, c, 'phone')}
+    ${isMe ? '' : segRow('Older or younger than you', sb('set-relage', 'data-v=""', !p.relAge, 'Not sure') + sb('set-relage', 'data-v="elder"', p.relAge === 'elder', 'Older') + sb('set-relage', 'data-v="younger"', p.relAge === 'younger', 'Younger'))}
+    ${isMe ? '' : fieldRow(id, c, 'callAs')}
+    ${fieldRow(id, c, 'groups')}
+  </section>`;
+}
+
 /* ---------- quick likes, right on the person page ---------- */
 function likesCard(id) {
   const p = S.people[id], likes = p.likes || [];
@@ -133,11 +187,14 @@ function qrelChips(to) {
   const toMe = to === S.me, nm = esc(S.people[to]?.name || '');
   const fam = relsFor(cur().id).map(([v, en, ta]) => hasRel(cur().id, v, to) ? `<button type="button" class="rc done" data-act="rel-already" data-id="${v}" aria-disabled="true"><b>${en}</b><span class="of">✓ Already linked</span></button>` : `<button type="button" class="rc" data-act="qrel-pick" data-id="${v}"><b>${en}</b>${toMe ? `<span class="ta">${ta}</span>` : `<span class="of">of ${nm}</span>`}</button>`).join('');
   const soc = OTHER_CIRCLES.filter(([v]) => v !== 'family').map(([v, en, ta]) => `<button type="button" class="rc" data-act="qrel-pick" data-id="${v}"><b>${v === 'acquaintance' && !toMe ? 'Met through' : en}</b>${toMe ? `<span class="ta">${ta}</span>` : `<span class="of">${v === 'acquaintance' ? nm : 'of ' + nm}</span>`}</button>`).join('');
-  return fam + soc;
+  // a relative you can't link yet (no family path saved): keep them in the family circle
+  const p = S.people[cur().id], rel = toMe && cur().id !== S.me && p.circle !== 'family' && !kinOf(p.id).family ? `<button type="button" class="rc" data-act="qrel-pick" data-id="family"><b>Other relative</b><span class="ta">உறவினர்</span></button>` : '';
+  return fam + soc + rel;
 }
 function qrelPick(kind) {
   const id = cur().id, to = cur().qrel.to, p = S.people[id];
   if (!to || to === id) return;
+  if (kind === 'family') { p.circle = 'family'; save(); rerender(); toast('Saved as a relative'); return; }
   if (SOCIAL[kind]) {
     if (to === S.me) {
       if (p.circle === kind) p.direct = true;   // same circle as who they came through: mark them as mine too
@@ -197,15 +254,15 @@ function pgPerson(c) {
     near.sort((a, b) => a.d - b.d || a.k.tk.join('.').localeCompare(b.k.tk.join('.')));
   }
 
-  return bar('', `<button class="txt-btn" data-act="edit" data-id="${esc(id)}">Edit</button>`) +
-    `<div class="ph">${avatar(p, 'xl')}<h2>${esc(p.name)}${isMe ? ' (you)' : ''}</h2>${p.dead ? `<div class="alt">${esc(lifeTxt(p))}</div>` : ''}
-      ${p.tamilName || p.nickname ? `<div class="alt">${[p.tamilName ? `<span class="ta">${esc(p.tamilName)}</span>` : '', p.nickname ? `“${esc(p.nickname)}”` : ''].filter(Boolean).join(', ')}</div>` : ''}</div>
+  const sexBtn = (g, l) => `<button class="btn-s" data-act="set-gender" data-id="${esc(id)}" data-g="${g}">${l}</button>`;
+  return bar('') + headCard(id, c) + `
     ${call}
-    ${!p.gender ? `<p class="pov-note" style="margin-top:14px;text-align:center">${esc(p.name)}’s gender isn’t saved, so some Tamil words may be wrong. <button class="link-btn" data-act="edit" data-id="${esc(id)}" style="margin:0">Add it now</button></p>` : ''}
+    ${!p.gender ? `<div class="pov-note" style="margin-top:14px;text-align:center">${esc(p.name)}’s gender isn’t saved, so some Tamil words may be wrong.<div class="qbtns" style="justify-content:center">${sexBtn('m', 'Male')}${sexBtn('f', 'Female')}</div></div>` : ''}
     <div class="acts">${acts.join('')}</div>
     <section class="card"><h3>Important dates</h3>
-      ${yearly.length || once.length ? `<div class="rows">${yearly.map(x => dateRow(x, x.kind === 'birthday' ? 'Birthday' : x.title)).join('')}${once.map(momentRow).join('')}</div>` : `<p class="muted" style="margin:0">No dates yet.</p>`}
+      ${yearly.length || once.length ? `<div class="rows">${yearly.map(x => dateRow(x, x.kind === 'birthday' ? 'Birthday' : x.title, x.kind === 'birthday' ? 'dob' : x.kind === 'memorial' ? 'dod' : '')).join('')}${once.map(momentRow).join('')}</div>` : `<p class="muted" style="margin:0">No dates yet.</p>`}
       ${quickDate(id, c)}</section>
+    ${aboutCard(id, c)}
     ${funcsCard(id, c)}
     ${likesCard(id)}
     ${docsCard(id)}
@@ -214,7 +271,6 @@ function pgPerson(c) {
     ${socialCard(id)}
     ${isMe ? '' : textCard(id, c, 'metHow', 'How you met', 'Where or how did you meet? e.g. at Arjun’s wedding')}
     ${textCard(id, c, 'notes', 'Notes', 'Anything to remember: kids’ names, a promise, their favourite temple…')}
-    ${(p.groups || []).length || p.phone ? `<section class="card"><h3>Details</h3><p class="prose">${[p.phone ? 'Phone: ' + esc(p.phone) : '', (p.groups || []).length ? 'Groups: ' + esc(p.groups.join(', ')) : ''].filter(Boolean).join('<br>')}</p></section>` : ''}
     ${isMe ? '' : `<button class="danger-txt" data-act="del-person" data-id="${esc(id)}">Delete ${esc(p.name)}</button>`}`;
 }
 
@@ -253,47 +309,41 @@ function relChips(relTo) {
   }).join('');
 }
 const likeRow = l => `<div class="like-row"><input class="lc" list="cats" placeholder="Category" value="${esc(l.cat)}" aria-label="Category">${valueField(l.cat, l.val)}<button type="button" data-act="like-rm" aria-label="Remove">${ICON.x}</button></div>`;
+// The full form is only for adding someone new; everyone saved is changed right on their page.
 function pgEdit(c) {
-  const isNew = !c.id, id = c.id, isMe = id === S.me;
-  const p = isNew ? blankPerson('', {}) : S.people[id];
   const opt = (v, l, sel) => `<option value="${esc(v)}"${sel ? ' selected' : ''}>${esc(l)}</option>`;
-  const relTo = c.relTo || S.me;
-  const links = isNew ? [] : directLinks(id);
-  const preCircle = isNew ? (c.circle || '') : [...(p.circle === 'family' ? (kinOf(id).family ? [] : [p.circle]) : knownDirectly(id) ? [p.circle] : []), ...(p.also || [])].join(',');
-  const title = isNew ? (c.relTo && c.relTo !== S.me ? `Add someone linked to ${esc(S.people[c.relTo].name)}` : 'Add person') : isMe ? 'Edit my profile' : 'Edit ' + esc(p.name);
-  return bar(title) + `<div id="pf" data-id="${esc(id || '')}">
+  const relTo = c.relTo || S.me, preCircle = c.circle || '';
+  const title = c.relTo && c.relTo !== S.me ? `Add someone linked to ${esc(S.people[c.relTo].name)}` : 'Add person';
+  return bar(title) + `<div id="pf" data-id="">
     <input type="hidden" id="f-rel" value=""><input type="hidden" id="f-circle" value="${esc(preCircle)}">
-    <div class="photo-pick"><label aria-label="Choose photo"><span id="photoPrev">${avatar(isNew ? blankPerson('new', {}) : p, 'xl')}</span><span class="cam">${ICON.camera}</span><input type="file" accept="image/*" id="photoIn" hidden></label>
-      ${p.photo ? `<button type="button" class="link-btn" data-act="photo-rm">Remove photo</button>` : ''}</div>
-    <label class="fld big">Name<input name="name" value="${esc(p.name)}" autocomplete="off" placeholder="Their name"></label>
-    <label class="fld">Name in Tamil <span class="hint">Optional</span><input name="tamilName" value="${esc(p.tamilName)}" class="ta" autocomplete="off"></label>
-    <div class="fld"><span>Gender <span class="hint">Required, so the Tamil words come out right</span></span><div class="seg"><button type="button" data-act="pick-gender" data-id="m" aria-pressed="${(p.gender || 'm') === 'm'}">Male</button><button type="button" data-act="pick-gender" data-id="f" aria-pressed="${p.gender === 'f'}">Female</button></div><input type="hidden" name="gender" value="${esc(p.gender || 'm')}"></div>
-    ${isMe ? '' : `<div class="deadf"><div class="fld"><span>Alive or passed away</span><div class="seg"><button type="button" data-act="pick-dead" data-id="" aria-pressed="${!p.dead}">Alive</button><button type="button" data-act="pick-dead" data-id="1" aria-pressed="${!!p.dead}">Passed away</button></div><input type="hidden" name="dead" value="${p.dead ? '1' : ''}"></div><label class="fld dodfld">Date they passed away <span class="hint">Optional</span><input type="date" name="dod" value="${esc(p.dod || '')}"></label></div>`}
-    ${isMe ? '' : `<section class="who"><h3>${isNew ? 'Who are they?' : 'Relationship'}</h3>
-      ${links.length ? `<p class="subh">Linked now</p>${links.map(x => `<div class="cur-link"><span><b>${esc(S.people[x.o].name)}</b> is their ${esc(x.word.toLowerCase())}</span><button type="button" data-act="rm-link" data-id="${esc(x.e.id)}" aria-label="Remove link">${ICON.x}</button></div>`).join('')}<p class="subh">Add another link</p>` : ''}
-      <div class="relto"><span>Related to</span>${personPicker('relTo', relTo, id || '', 'Related to')}</div>
-      <div class="relgrid" id="relgrid">${relChips(relTo, '')}</div>
+    <div class="photo-pick"><label aria-label="Choose photo"><span id="photoPrev">${avatar(blankPerson('new', {}), 'xl')}</span><span class="cam">${ICON.camera}</span><input type="file" accept="image/*" id="photoIn" hidden></label></div>
+    <label class="fld big">Name<input name="name" value="" autocomplete="off" placeholder="Their name"></label>
+    <label class="fld">Name in Tamil <span class="hint">Optional</span><input name="tamilName" value="" class="ta" autocomplete="off"></label>
+    <div class="fld"><span>Gender <span class="hint">Required, so the Tamil words come out right</span></span><div class="seg"><button type="button" data-act="pick-gender" data-id="m" aria-pressed="true">Male</button><button type="button" data-act="pick-gender" data-id="f" aria-pressed="false">Female</button></div><input type="hidden" name="gender" value="m"></div>
+    <div class="deadf"><div class="fld"><span>Alive or passed away</span><div class="seg"><button type="button" data-act="pick-dead" data-id="" aria-pressed="true">Alive</button><button type="button" data-act="pick-dead" data-id="1" aria-pressed="false">Passed away</button></div><input type="hidden" name="dead" value=""></div><label class="fld dodfld">Date they passed away <span class="hint">Optional</span><input type="date" name="dod" value=""></label></div>
+    <section class="who"><h3>Who are they?</h3>
+      <div class="relto"><span>Related to</span>${personPicker('relTo', relTo, '', 'Related to')}</div>
+      <div class="relgrid" id="relgrid">${relChips(relTo)}</div>
       <p class="hint-line" style="margin:8px 0 0;font-size:.84rem">Tap every relationship that applies. To link them to someone else too, change “Related to” and tap again.</p>
       <div id="pending"></div>
       <p class="subh">Not family</p>
       <div class="relgrid" id="othergrid">${otherChips(relTo, preCircle)}</div>
-    </section>`}
-    <div class="two"><label class="fld">Birthday<input type="date" name="dob" value="${esc(p.dob)}"></label>
-      <label class="fld">Phone<input type="tel" name="phone" value="${esc(p.phone)}" placeholder="For call and WhatsApp" autocomplete="off"></label></div>
-    <div class="fld"><span>Likes</span><div id="likesEdit">${(p.likes || []).map(likeRow).join('')}</div>
+    </section>
+    <div class="two"><label class="fld">Birthday<input type="date" name="dob" value=""></label>
+      <label class="fld">Phone<input type="tel" name="phone" value="" placeholder="For call and WhatsApp" autocomplete="off"></label></div>
+    <div class="fld"><span>Likes</span><div id="likesEdit"></div>
       <div class="chips wrap">${QUICK_CATS.map(cat => `<button type="button" class="chip" data-act="like-add" data-id="${esc(cat)}">${catIcon(cat)} ${esc(cat)}</button>`).join('')}<button type="button" class="chip" data-act="like-add" data-id="">＋ Other</button></div></div>
-    ${isMe ? '' : `<label class="fld">How or where you met <span class="hint">Helpful for friends and new people</span><textarea name="metHow">${esc(p.metHow)}</textarea></label>`}
+    <label class="fld">How or where you met <span class="hint">Helpful for friends and new people</span><textarea name="metHow"></textarea></label>
     <details class="more"><summary>More details</summary>
-      <label class="fld">Nickname<input name="nickname" value="${esc(p.nickname)}" autocomplete="off"></label>
-      <div class="two">
-        ${isMe ? '' : `<label class="fld">Older or younger than you?<select name="relAge">${opt('', 'Not sure', !p.relAge)}${opt('elder', 'Older', p.relAge === 'elder')}${opt('younger', 'Younger', p.relAge === 'younger')}</select></label>`}</div>
-      ${isMe ? '' : `<label class="fld">What do you call them? <span class="hint">Only if your family uses a different word</span><input name="callAs" value="${esc(p.callAs)}" placeholder="e.g. சின்ன மாமா" class="ta" autocomplete="off"></label>`}
-      <label class="fld">Groups <span class="hint">Separate with commas, like College gang, Office team</span><input name="groups" value="${esc((p.groups || []).join(', '))}" autocomplete="off"></label>
-      <label class="fld">Notes<textarea name="notes">${esc(p.notes)}</textarea></label>
+      <label class="fld">Nickname<input name="nickname" value="" autocomplete="off"></label>
+      <div class="two"><label class="fld">Older or younger than you?<select name="relAge">${opt('', 'Not sure', true)}${opt('elder', 'Older')}${opt('younger', 'Younger')}</select></label></div>
+      <label class="fld">What do you call them? <span class="hint">Only if your family uses a different word</span><input name="callAs" value="" placeholder="e.g. சின்ன மாமா" class="ta" autocomplete="off"></label>
+      <label class="fld">Groups <span class="hint">Separate with commas, like College gang, Office team</span><input name="groups" value="" autocomplete="off"></label>
+      <label class="fld">Notes<textarea name="notes"></textarea></label>
     </details>
     <datalist id="cats">${CATS.map(x => `<option value="${esc(x[0])}">`).join('')}</datalist>
   </div>
-  <div class="savebar"><div class="in"><p class="err" id="err" hidden></p><button class="btn-p" data-act="save-person">${isNew ? 'Save person' : 'Save changes'}</button></div></div>`;
+  <div class="savebar"><div class="in"><p class="err" id="err" hidden></p><button class="btn-p" data-act="save-person">Save person</button></div></div>`;
 }
 const hasEdge = fn => S.edges.some(fn);
 // the husband/wife, only when there is exactly one – with two or more we can’t guess which one is meant
@@ -307,7 +357,7 @@ function linkProblem(id, rel, to, selfName) {
   const direct = (a, b) => S.edges.find(e => (e.type === 'parent' && ((e.child === a && e.parent === b) || (e.child === b && e.parent === a))) || ((e.type === 'spouse' || e.type === 'sibling') && [e.a, e.b].includes(a) && [e.a, e.b].includes(b)));
   if (id && id === to) return 'A person can’t be related to themselves.';
   const pg = id && S.people[id] ? S.people[id].gender : '';
-  if (pg && REL_GENDER[rel] && REL_GENDER[rel] !== pg) return `${cap(nm(id))} ${id === S.me ? 'are' : 'is'} saved as ${pg === 'm' ? 'male' : 'female'}, so “${(FAM_RELS.find(r => r[0] === rel) || [0, rel])[1]}” doesn’t fit. Change the gender in Edit first if it’s wrong.`;
+  if (pg && REL_GENDER[rel] && REL_GENDER[rel] !== pg) return `${cap(nm(id))} ${id === S.me ? 'are' : 'is'} saved as ${pg === 'm' ? 'male' : 'female'}, so “${(FAM_RELS.find(r => r[0] === rel) || [0, rel])[1]}” doesn’t fit. Change the gender under About on their page first if it’s wrong.`;
   const isParent = rel === 'father' || rel === 'mother', isChild = rel === 'son' || rel === 'daughter';
   if (isParent || isChild) {
     const child = isParent ? to : id, parent = isParent ? id : to;
@@ -381,14 +431,6 @@ function removeLinks(grp) {
   }
   kc = {};
 }
-function markRemoving() {
-  document.querySelectorAll('.cur-link').forEach(r => {
-    const b = r.querySelector('[data-act="rm-link"],[data-act="rm-undo"]'); if (!b) return;
-    const on = pendingRemove.has(b.dataset.id);
-    r.classList.toggle('removing', on); b.dataset.act = on ? 'rm-undo' : 'rm-link';
-    b.innerHTML = on ? 'Undo' : ICON.x; b.setAttribute('aria-label', on ? 'Undo remove' : 'Remove link');
-  });
-}
 function formErr(m, focusSel) { const er = $('#err'); er.textContent = m; er.hidden = false; if (focusSel) $(focusSel)?.focus(); }
 function renderPending() {
   const el = $('#pending'); if (!el) return;
@@ -404,43 +446,37 @@ function renderPending() {
   if (rt) { $('#relgrid').innerHTML = relChips(rt.value); const og = $('#othergrid'); if (og) og.innerHTML = otherChips(rt.value, $('#f-circle').value); }
 }
 function savePerson() {
-  const f = $('#pf'); let id = f.dataset.id;
+  const f = $('#pf');
   const val = n => (f.querySelector(`[name="${n}"]`)?.value || '').trim();
   const name = val('name');
   if (!name) return formErr('Add a name to save.', '[name="name"]');
   if (!val('gender')) return formErr('Choose Male or Female to save.');
-  if (id && S.people[id].gender && val('gender') !== S.people[id].gender) { const gp = genderProblem(id, val('gender')); if (gp) return formErr(gp); }
-  const isNew = !id, circ = $('#f-circle').value, circs = circ.split(',').filter(Boolean), links = pendingLinks.filter(l => l.to !== id);
+  const circ = $('#f-circle').value, circs = circ.split(',').filter(Boolean), links = pendingLinks;
   const famL = links.find(l => l.rel), socL = links.find(l => l.social);
-  if (isNew && !links.length && !circ) return formErr('Choose who they are, like Father or Friend.');
-  for (const l of links) if (l.rel) { const pr = linkProblem(id, l.rel, l.to, name); if (pr) return formErr(pr); }
-  if (isNew) { id = uid(); S.people[id] = blankPerson(id); }
+  if (!links.length && !circ) return formErr('Choose who they are, like Father or Friend.');
+  for (const l of links) if (l.rel) { const pr = linkProblem('', l.rel, l.to, name); if (pr) return formErr(pr); }
+  const id = uid(); S.people[id] = blankPerson(id);
   const p = S.people[id];
   Object.assign(p, { name, tamilName:val('tamilName'), nickname:val('nickname'), gender:val('gender'), dob:val('dob'), phone:val('phone'),
-    groups: val('groups').split(',').map(x => x.trim()).filter(Boolean), notes:val('notes') });
-  if (id !== S.me) Object.assign(p, { relAge:val('relAge'), callAs:val('callAs'), metHow:val('metHow') });
+    groups: val('groups').split(',').map(x => x.trim()).filter(Boolean), notes:val('notes'), relAge:val('relAge'), callAs:val('callAs'), metHow:val('metHow') });
   p.dead = val('dead') === '1'; p.dod = p.dead ? val('dod') : '';
-  let dropped = 0;
-  if (p.dead) for (const fn of S.funcs || []) if (!fn.on || daysUntil(fn.on) >= 0) { const n = (fn.guests || []).length; fn.guests = (fn.guests || []).filter(g => g.pid !== id || g.moi); dropped += n - fn.guests.length; }
   if (famL && (famL.to === S.me || S.people[famL.to].circle === 'family')) p.circle = 'family';
   else if (circs.length) p.circle = circs.includes('family') ? 'family' : circs[0];
-  else if (famL && (isNew || p.circle === 'family')) p.circle = S.people[famL.to].circle;
-  else if (isNew && socL) p.circle = socL.social;
+  else if (famL) p.circle = S.people[famL.to].circle;
+  else if (socL) p.circle = socL.social;
   p.also = circs.filter(x => x !== p.circle && SOCIAL[x]);
   p.direct = !!SOCIAL[p.circle] && circs.includes(p.circle);   // ticked Friend/Colleague/Met for me, not just inherited from who they came through
-  if (pendingPhoto !== null) p.photo = pendingPhoto;
+  if (pendingPhoto) p.photo = pendingPhoto;
   f.querySelectorAll('input.lv[data-pick]').forEach(resolvePick);
   p.likes = [...f.querySelectorAll('.like-row')].map(r => ({ cat:r.querySelector('.lc').value.trim() || 'Other', val:r.querySelector('.lv').value.trim() })).filter(l => l.val);
-  for (const c of pendingClicked) removeLinks(linkGroup(c));
   for (const l of links) {
     if (l.rel) addLink(id, l.rel, l.to);
     else if (!hasEdge(e => e.type === 'social' && [e.a, e.b].includes(id) && [e.a, e.b].includes(l.to))) S.edges.push({ id: uid(), type:'social', a:l.to, b:id, kind:l.social });
   }
-  save(); pendingPhoto = null; pendingLinks = []; pendingRemove = new Set(); pendingClicked = new Set();
-  ui.stack.pop();
-  if (isNew) ui.stack.push({ p:'person', id });
+  save(); pendingPhoto = null; pendingLinks = [];
+  ui.stack.pop(); ui.stack.push({ p:'person', id });
   render(); window.scrollTo(0, 0);
-  toast(isNew ? `Added ${p.name}` : dropped ? `Saved. Removed from ${dropped} upcoming guest list${dropped === 1 ? '' : 's'}.` : 'Saved');
+  toast(`Added ${p.name}`);
 }
 function readPhoto(file) {
   if (!file) return;
@@ -533,9 +569,10 @@ function cropUse() {
   const c = photoCrop, out = document.createElement('canvas');
   out.width = out.height = CROP_OUT;
   cropPaint(out.getContext('2d'), c, CROP_OUT);
-  pendingPhoto = out.toDataURL('image/jpeg', 0.82);
-  const prev = $('#photoPrev'); if (prev) prev.innerHTML = `<span class="av xl"><img src="${pendingPhoto}" alt=""></span>`;
+  const data = out.toDataURL('image/jpeg', 0.82), c0 = cur();
   photoCropClose();
+  if ($('#pf')) { pendingPhoto = data; $('#photoPrev').innerHTML = `<span class="av xl"><img src="${data}" alt=""></span>`; }   // adding someone: kept until Save
+  else if (c0.p === 'person' && S.people[c0.id]) { S.people[c0.id].photo = data; save(); rerender(); toast('Photo saved'); }
 }
 function photoCropClose() {
   const c = photoCrop; if (!c) return false;

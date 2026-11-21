@@ -4,7 +4,8 @@ const PAGES = { home:pgHome, people:pgPeople, dates:pgDates, family:pgFamily, pe
 // false when the page points at something that has since been deleted
 function entryOk(c) {
   if (!PAGES[c.p]) return false;
-  if ((c.p === 'person' || (c.p === 'edit' && c.id) || c.p === 'quick') && !S.people[c.id]) return false;
+  if (c.p === 'edit' && c.id) return false;   // people are changed on their own page now
+  if ((c.p === 'person' || c.p === 'quick') && !S.people[c.id]) return false;
   if (c.p === 'event' && c.eid && !S.events.some(e => e.id === c.eid)) return false;
   if ((c.p === 'doc' || (c.p === 'docedit' && c.id)) && !(S.docs || []).some(d => d.id === c.id)) return false;
   if (c.p === 'term' && !(S.docs || []).some(d => d.id === c.doc)) return false;
@@ -29,7 +30,7 @@ function render() {
       const sameBase = c === shell.base, y = window.scrollY;
       clearGhosts(app);
       if (!sameBase && (shell.dir === 'fwd' || shell.dir === 'back') && motionOk() && app.firstChild) ghostOf(app.innerHTML, y, shell.dir);
-      if (c.p === 'edit') { pendingPhoto = null; pendingLinks = []; pendingRemove = new Set(); pendingClicked = new Set(); }
+      if (c.p === 'edit') { pendingPhoto = null; pendingLinks = []; }
       if (c.p === 'family') {
         EGO = c.pov && S.people[c.pov] ? c.pov : null; try { app.innerHTML = pgFamily(c); } finally { EGO = null; }
         const eg = app.querySelector('.tnode.ego'), sc = app.querySelector('.tree-scroll');
@@ -150,7 +151,7 @@ function pgQuick(c) {
   const link = (href, ic, l, cls, ext) => ph ? `<a class="qi ${cls}" href="${esc(href)}"${ext ? ' target="_blank" rel="noopener"' : ''} data-close="1"><span class="ic">${ICON[ic]}</span>${l}</a>`
     : `<button class="qi ${cls}" data-act="no-phone" data-id="${esc(p.id)}" aria-disabled="true"><span class="ic">${ICON[ic]}</span>${l}</button>`;
   return `<div class="qhead">${avatar(p)}<span class="tx"><b>${esc(isMe ? p.name + ' (you)' : p.name)}</b><small>${isMe ? 'You' : termLine(kinOf(p.id))}</small></span></div>
-    <div class="qgrid">${link(ph ? 'tel:' + ph.tel : '', 'phone', 'Call', 'tel')}${link(ph ? 'https://wa.me/' + ph.wa : '', 'chat', 'WhatsApp', 'wa', true)}${it('edit', 'edit', 'Edit')}${it('event-new', 'addDate', 'Add date')}${it('person', 'open', 'Open')}</div>`;
+    <div class="qgrid">${link(ph ? 'tel:' + ph.tel : '', 'phone', 'Call', 'tel')}${link(ph ? 'https://wa.me/' + ph.wa : '', 'chat', 'WhatsApp', 'wa', true)}${it('event-new', 'addDate', 'Add date')}${it('person', 'open', 'Open')}</div>`;
 }
 PAGES.menu = pgMenu; PAGES.quick = pgQuick;
 
@@ -350,7 +351,7 @@ const H = {
   },
   fab: () => { if (cur().p === 'menu') back(); else push('menu'); },
   'menu-go': (id, a) => { ui.stack.pop(); const fn = H[a.dataset.go]; if (fn) fn(id, a); else render(); },
-  'no-phone': () => toast('No phone number saved. Tap Edit to add one.'),
+  'no-phone': id => { ui.stack.pop(); push('person', { id, qf: 'phone' }); setTimeout(() => $('#qfIn')?.focus(), 350); },
   install: () => installApp(),
   'tree-find': () => { const b = $('.tfind'); b.hidden = !b.hidden; if (!b.hidden) { $('#tfindIn').value = ''; treeFindList(); $('#tfindIn').focus(); } },
   'tree-goto': id => { $('.tfind').hidden = true; treeFocus(id, true); },
@@ -426,6 +427,15 @@ const H = {
   'qt-open': id => { cur().qt = id; rerender(); const t = $('#qtIn'); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); } },
   'qt-cancel': () => { delete cur().qt; rerender(); },
   'qt-save': id => { S.people[cur().id][id] = $('#qtIn').value.trim(); delete cur().qt; save(); rerender(); toast('Saved'); },
+  // name and details, changed right on the person page
+  'qh-open': () => { const c = cur(); delete c.qf; c.qh = 1; rerender(); $('#qhName')?.focus(); },
+  'qh-cancel': () => { delete cur().qh; rerender(); },
+  'qh-save': () => qhSave(),
+  'qf-open': id => { const c = cur(); delete c.qh; c.qf = id; rerender(); const t = $('#qfIn'); if (t) { t.scrollIntoView({ block: 'center' }); t.focus({ preventScroll: true }); } },
+  'qf-cancel': () => { delete cur().qf; rerender(); },
+  'qf-save': () => qfSave(),
+  'set-relage': (id, a) => { S.people[id].relAge = a.dataset.v; save(); rerender(); },
+  'photo-clear': (id, a) => arm(a, 'Tap again to remove', () => { S.people[id].photo = ''; delete cur().qh; save(); rerender(); toast('Photo removed'); }),
   'moi-add': () => { cur().add = 'got'; rerender(); $('#mnPerson')?.focus(); },
   'moi-cancel': () => { delete cur().add; rerender(); },
   'moi-mode': (id, a) => { cur().add = id; a.parentElement.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === a))); $('#mnGot').hidden = id !== 'got'; $('#mnGave').hidden = id !== 'gave'; },
@@ -491,12 +501,14 @@ const H = {
     const p = S.people[id]; p.dead = a.dataset.v === '1'; if (!p.dead) p.dod = '';
     const n = p.dead ? dropFromGuests(id) : 0; save();
     a.parentElement.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === a)));
+    if (cur().p === 'person') rerender();
     if (n) toast(`${p.name} removed from ${n} upcoming guest list${n === 1 ? '' : 's'}.`);
   },
   'set-gender': (id, a) => {
     const gp = genderProblem(id, a.dataset.g); if (gp) { toast(gp); return; }
     S.people[id].gender = a.dataset.g; save();
     a.parentElement.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === a)));
+    if (cur().p === 'person') rerender();   // the Tamil words on the page depend on it
   },
   'bulk-male': (id, a) => arm(a, 'Tap again to confirm', () => {
     // husband/wife pairs: the partner becomes the opposite gender
@@ -510,7 +522,6 @@ const H = {
   swap: () => { const c = cur(), a = c.a || S.me; c.a = c.b || S.me; c.b = a; render(); },
   go: (id, a) => push(id, a.dataset.f ? { f: a.dataset.f } : {}),
   person: id => push('person', { id }),
-  edit: id => push('edit', { id }),
   new: (id, a) => push('edit', { id: '', relTo: id || '', circle: a.dataset.circle || '' }),
   'event-new': id => push('event', { eid: '', preset: id || '' }),
   'event-edit': id => push('event', { eid: id }),
@@ -541,15 +552,6 @@ const H = {
   pick: (id, a) => { $('#f-' + a.dataset.group).value = id; a.parentElement.querySelectorAll('[data-act="pick"]').forEach(b => b.setAttribute('aria-pressed', String(b === a))); },
   'like-add': id => { const box = $('#likesEdit'); box.insertAdjacentHTML('beforeend', likeRow({ cat: id, val: '' })); box.lastElementChild.querySelector(id ? '.lv' : '.lc').focus(); },
   'like-rm': (id, a) => a.closest('.like-row').remove(),
-  'photo-rm': (id, a) => { pendingPhoto = ''; $('#photoPrev').innerHTML = avatar(blankPerson('new', { name: $('[name="name"]').value }), 'xl'); a.remove(); },
-  'rm-link': eid => {
-    pendingClicked.add(eid); const grp = linkGroup(eid); grp.forEach(x => pendingRemove.add(x.id)); markRemoving();
-    toast(grp.length > 1 ? `${grp.length} links will be removed when you save` : 'Will be removed when you save');
-  },
-  'rm-undo': eid => {
-    for (const c of [...pendingClicked]) if (linkGroup(c).some(x => x.id === eid)) pendingClicked.delete(c);
-    pendingRemove = new Set([...pendingClicked].flatMap(c => linkGroup(c).map(x => x.id))); markRemoving();
-  },
   'save-person': () => savePerson(),
   'del-person': (id, a) => arm(a, (() => { const n = unlinkedIfDeleted(id).length; return n ? `Tap again. ${n} ${n === 1 ? 'person' : 'people'} will lose their link` : 'Tap again to delete'; })(), () => {
     const before = reachMe(null), dname = S.people[id].name;
@@ -606,6 +608,8 @@ document.addEventListener('change', e => {
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter' || !e.target.closest) return;
   if (e.target.closest('#qlike')) { e.preventDefault(); qlikeSave(); }
+  else if (e.target.id === 'qfIn') { e.preventDefault(); qfSave(); }
+  else if (e.target.closest('.ph-edit')) { e.preventDefault(); qhSave(); }
   else if (e.target.id === 'askIn' && !e.shiftKey) { e.preventDefault(); askAI(e.target.value); }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && photoCrop) { photoCropClose(); return; } if (e.key === 'Escape' && ui.stack.length > 1 && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) back(); });
