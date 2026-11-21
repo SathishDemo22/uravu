@@ -27,11 +27,9 @@
 <h1>Privacy</h1>
 <p class="muted">Uravu (உறவு): what is stored, where, and who can see it. Last updated 21 November 2026.</p>
 
-<h2>On your device</h2>
-<p>Everything you add (people, relationships, dates, likes, notes, functions, guest lists, moi and documents) is saved in your browser on this device. Uravu works fully without an account, and then nothing leaves your device.</p>
-
-<h2>If you sign in</h2>
-<p>Signing in is optional. When you do, a copy of your data is synced to a database run on <a href="https://supabase.com" rel="noopener">Supabase</a>, so you can use Uravu on more than one device. Your device keeps its own full copy and keeps working offline.</p>
+<h2>Where your data is kept</h2>
+<p>You sign in to use Uravu. Everything you add (people, relationships, dates, likes, notes, functions, guest lists, moi and documents) is saved in your account, in a database run on <a href="https://supabase.com" rel="noopener">Supabase</a>, so it’s the same on every device you sign in on.</p>
+<p><b>Nothing about your family is stored on your phone or computer.</b> While Uravu is open, your data is only in the app’s memory, and it’s gone when you close it. The device remembers just two things: that you’re signed in, and (once you’ve entered it) the key that opens your document vault. Without internet you can look at what’s already open, but changes can’t be saved.</p>
 <ul>
   <li><b>Your account:</b> your email address, and your password stored by Supabase in hashed form. If you use Google, Google tells us your email address.</li>
   <li><b>Your data:</b> people, relationships, dates, likes, notes, functions, guests and moi, stored as you entered them.</li>
@@ -44,7 +42,7 @@
 <ul>
   <li>The lock is AES-256-GCM. The key is made on your device from your <b>vault PIN</b> (PBKDF2 with SHA-256, 600,000 rounds). The PIN and the key are never sent anywhere.</li>
   <li>Files go into a private storage area with one folder per person. They are fetched only through links that expire after one minute.</li>
-  <li><b>If you forget your vault PIN, the vault can’t be opened or recovered</b>, by you or anyone else. Documents already on your devices stay there.</li>
+  <li><b>If you forget your vault PIN, the vault can’t be opened or recovered</b>, by you or anyone else. There is no other copy of the locked documents, so write the PIN down somewhere safe.</li>
   <li>A short PIN is easier to guess for someone who has a copy of the locked data. A longer PIN or passphrase is much safer.</li>
 </ul>
 </div>
@@ -60,7 +58,7 @@
 <h2>Your choices</h2>
 <ul>
   <li><b>Download all your data:</b> Settings › Account › Download all my data (or Settings › Save a backup file). The file includes document photos. Keep it somewhere safe: it is <i>not</i> encrypted.</li>
-  <li><b>Sign out:</b> your data stays on the device. Choose “Sign out and remove data from this device” on a shared device.</li>
+  <li><b>Sign out:</b> the app forgets your sign-in and the vault key on that device. Nothing else was stored there.</li>
   <li><b>Delete your account:</b> Settings › Account › Delete my account and all data. This removes your account, every synced row and every vault file from the server straight away. Supabase’s own backups of the database expire on their normal schedule.</li>
 </ul>
 

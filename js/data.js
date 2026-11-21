@@ -68,6 +68,7 @@ function normalize() {
   return changed;
 }
 function load() {
+  if (cloudConfigured()) { S = cloudEmpty(); return; }   // online only: the data comes from the account after sign-in
   try {
     const r = localStorage.getItem(KEY);
     if (r) { S = JSON.parse(r); if (S && S.people && S.people[S.me]) { if (normalize()) save(true); return; } }
@@ -77,10 +78,10 @@ function load() {
 let dataVer = 0;   // goes up on every save, so the page under an open sheet knows to redraw
 function save(quiet) {
   kc = {}; dataVer++;
+  if (cloudConfigured()) { cloudSaved(); return; }   // online only: straight to the account, nothing kept on this device
   try { localStorage.setItem(KEY, JSON.stringify(S)); }
   catch (e) { if (!quiet) toast('Couldn’t save. Try a smaller photo.'); }
-  if (!quiet && typeof askPersist === 'function') askPersist();   // ask the browser not to clear this data
-  if (typeof syncSoon === 'function' && !cloudApplying) syncSoon();   // signed in: send the change in a few seconds
+  if (!quiet) askPersist();   // ask the browser not to clear this data
 }
 
 /* ---------- kinship engine ---------- */

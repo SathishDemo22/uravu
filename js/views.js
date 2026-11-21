@@ -73,8 +73,9 @@ function homeBody() {
   let h = `<div class="qa">${tile('dates', ICON.cake, 'Dates', b.today, 'today')}${tile('docs', ICON.doc, 'Documents', b.dues, 'due')}${tile('moi', ICON.rupee, 'Moi')}${tile('connect', ICON.link, 'Connected')}</div>`;
   if (installEvt) h += installRow();
   if (aiAvailable !== false) h += `<button class="askbar" data-act="go" data-id="ask">${ICON.spark}<span><b>Ask Uravu</b><small>“What does Amma like?” “Whose birthday is next?”</small></span></button>`;
-  if (cloud.user && syncState && syncState.setup) {   // signed in: the account is the backup; only nudge about the vault
-    if (docsWaiting()) h += `<button class="pov-note" data-act="go" data-id="account" style="display:block;width:100%;text-align:left;margin-top:12px">🔒 Documents aren’t backed up yet. <b style="color:var(--primary)">${cloud.vault ? 'Enter vault PIN' : 'Set a vault PIN'}</b></button>`;
+  if (cloud.user) {   // online: the account is the copy; only nudge about the vault and an old copy on this device
+    if (docsWaiting()) h += `<button class="pov-note" data-act="go" data-id="account" style="display:block;width:100%;text-align:left;margin-top:12px">🔒 ${cloud.vault ? 'Documents are locked on this device.' : 'Documents need a vault PIN.'} <b style="color:var(--primary)">${cloud.vault ? 'Enter vault PIN' : 'Set a vault PIN'}</b></button>`;
+    if (cloud.old) h += `<button class="pov-note" data-act="go" data-id="oldcopy" style="display:block;width:100%;text-align:left;margin-top:12px">📦 An old copy is still saved on this device. <b style="color:var(--primary)">Check it</b></button>`;
   }
   else if (needsBackup()) h += `<button class="pov-note" data-act="go" data-id="settings" style="display:block;width:100%;text-align:left;margin-top:12px">💾 Saved only on this phone. <b style="color:var(--primary)">Back up now</b></button>`;
   const missingG = noGender().length;

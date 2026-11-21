@@ -1,8 +1,8 @@
 # Uravu – உறவு
 
 Family and friends, in Tamil and English. A single-page app that installs on your phone and works offline.
-Everything is saved on the phone itself (browser storage); use **Settings › Save a backup file** to keep a copy.
-Optional: sign in to back up and sync across devices with Supabase. Document numbers and files are encrypted on the phone first. See **[SUPABASE.md](SUPABASE.md)** to set it up.
+With Supabase set up in `config.js`, Uravu is **online only**: you sign in, your family is kept in your account (the same on every device, with live updates), and nothing about your family is stored on the phone. Document numbers and files are encrypted on the phone with your vault PIN first. See **[SUPABASE.md](SUPABASE.md)**.
+Without `config.js` values it works the original way, saved on the device only.
 
 ## Files
 
@@ -130,8 +130,6 @@ Installed phones get the new version the next time they open the app while onlin
 
 ## Your data
 
-- Without signing in, data stays on each phone and is never sent to any server. The only things downloaded from outside are the Google Fonts.
-- If you sign in (optional, when `config.js` is filled in), a copy syncs to your Supabase project. Only you can read it (row-level security). Document numbers, notes, photos and PDFs are encrypted on the phone with your vault PIN before upload. See [privacy.html](privacy.html).
-- The phone always keeps its own full copy and works offline.
+- With accounts on (the published app): you sign in, and your data is kept in your Supabase account. Only you can read it (row-level security). Document numbers, notes, photos and PDFs are encrypted on the phone with your vault PIN before they're saved. Nothing about your family is stored on the phone; the app needs internet to make changes. See [privacy.html](privacy.html).
+- **Account › Download all my data** saves everything as one file (not encrypted, so keep it safe). It can be restored from Settings.
 - Publishing the app does not publish your data.
-- To move data to another phone: sign in on both, or save a backup file on the old phone and use **Restore from a backup file** on the new one.
