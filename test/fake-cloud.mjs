@@ -48,6 +48,12 @@ export function startFakeCloud(port) {
       need(uid); const k = `${uid}|settings|vault`; if (rows.has(k)) return false;
       rows.set(k, { owner_id: uid, t: 'settings', id: 'vault', data: v, updated_at: new Date().toISOString(), deleted: false, server_at: serverAt() }); return true;
     },
+    updateVault({ old, v }, uid) {
+      need(uid); const k = `${uid}|settings|vault`, r = rows.get(k);
+      if (!r || r.deleted || r.data.salt !== old.salt) return false;
+      rows.set(k, Object.assign({}, r, { data: v, updated_at: new Date(Math.max(Date.now(), Date.parse(r.updated_at) + 1)).toISOString(), server_at: serverAt() }));
+      setTimeout(() => notify(uid, 'settings'), 30); return true;
+    },
     upload({ name, b64 }, uid) { need(uid); files.set(`${uid}/${name}`, b64); return true; },
     download({ name }, uid) { need(uid); return files.get(`${uid}/${name}`) || null; },
     removeFiles({ names }, uid) { need(uid); names.forEach(n => files.delete(`${uid}/${n}`)); return true; },
@@ -120,6 +126,7 @@ export const fakeApiScript = url => `(() => {
     count: t => call('count', { t }),
     getVault: () => call('getVault', {}),
     insertVault: v => call('insertVault', { v }),
+    updateVault: (old, v) => call('updateVault', { old, v }),
     upload: (name, bytes) => call('upload', { name, b64: b64(bytes) }),
     download: async name => { const s = await call('download', { name }); return s ? unb64(s) : null; },
     removeFiles: names => call('removeFiles', { names }),

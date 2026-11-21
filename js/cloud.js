@@ -92,10 +92,12 @@ const cloudEmpty = () => ({ me: 'me', people: { me: blankPerson('me', {}) }, edg
 const te = new TextEncoder(), td = new TextDecoder();
 function b64(bytes) { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s); }
 function unb64(str) { const bin = atob(str), a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a; }
-async function vaultKeyFrom(pin, saltB64, iter) {
-  const base = await crypto.subtle.importKey('raw', te.encode(pin), 'PBKDF2', false, ['deriveKey']);
-  return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: unb64(saltB64), iterations: iter || VAULT_ITER, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+// 256 bits from the PIN. Used as the vault key itself (a vault whose PIN was never changed), or to unwrap it.
+async function vaultBits(pin, saltB64, iter) {
+  const base = await crypto.subtle.importKey('raw', te.encode(pin), 'PBKDF2', false, ['deriveBits']);
+  return new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: unb64(saltB64), iterations: iter || VAULT_ITER, hash: 'SHA-256' }, base, 256));
 }
+const aesKey = raw => crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
 async function sealBytes(key, bytes) {
   const iv = crypto.getRandomValues(new Uint8Array(12)), ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, bytes));
   const out = new Uint8Array(12 + ct.length); out.set(iv); out.set(ct, 12); return out;
@@ -157,6 +159,14 @@ function supabaseApi() {
       const r = await sb.from('settings').insert({ owner_id: me.uid, id: 'vault', data: v, updated_at: new Date().toISOString() });
       if (r.error) { if (r.error.code === '23505') return false; throw r.error; }
       return true;
+    },
+    // Replace the vault row, only if it still is the one the PIN was checked against
+    async updateVault(old, v) {
+      const cur = ok(await sb.from('settings').select('data, updated_at').eq('id', 'vault').eq('deleted', false).maybeSingle());
+      if (!cur || !cur.data || cur.data.salt !== old.salt) return false;
+      const at = new Date(Math.max(Date.now(), Date.parse(cur.updated_at) + 1)).toISOString();   // newer than the row, even with a slow clock
+      const d = ok(await sb.from('settings').update({ data: v, updated_at: at }).eq('id', 'vault').eq('data->>salt', old.salt).select('id'));
+      return d.length > 0;
     },
     async upload(name, bytes) { ok(await bucket().upload(me.uid + '/' + name, new Blob([bytes], { type: 'application/octet-stream' }), { upsert: true, contentType: 'application/octet-stream' })); },
     // files open only through a signed link that lasts one minute
@@ -364,19 +374,41 @@ if (cloudConfigured()) Object.assign(IDB, {
 });
 
 /* ---------- vault PIN ---------- */
+// The vault row (settings 'vault') holds { salt, iter, check } and, once the PIN has been changed, wrap: the vault
+// key locked with the PIN. Without wrap, the key is made from the PIN directly. Either way, no PIN and no open key.
 async function vaultCreate(pin) {
-  const salt = b64(crypto.getRandomValues(new Uint8Array(16))), key = await vaultKeyFrom(pin, salt, VAULT_ITER);
+  const salt = b64(crypto.getRandomValues(new Uint8Array(16))), key = await aesKey(await vaultBits(pin, salt, VAULT_ITER));
   const v = { salt, iter: VAULT_ITER, check: await sealJSON(key, { ok: 'uravu' }) };
   const made = await cloud.api.insertVault(v);   // fails if another device made one first
   if (!made) { await vaultRefresh(); throw new Error('exists'); }
   cloud.vault = v; await vaultKeep(key);
 }
+// The vault key's bytes from the PIN, checked against the vault's check value
+async function vaultOpenRaw(pin, v) {
+  const bits = await vaultBits(pin, v.salt, v.iter);
+  let raw = bits;
+  if (v.wrap) { try { raw = await openBytes(await aesKey(bits), unb64(v.wrap)); } catch (e) { throw new Error('wrong pin'); } finally { bits.fill(0); } }
+  const key = await aesKey(raw);
+  try { const c = await openJSON(key, v.check); if (c.ok !== 'uravu') throw 0; } catch (e) { raw.fill(0); throw new Error('wrong pin'); }
+  return { raw, key };
+}
 async function vaultUnlock(pin) {
-  if (!cloud.vault) await vaultRefresh();
+  await vaultRefresh().catch(() => {});   // the PIN may have been changed on another device
   if (!cloud.vault) throw new Error('no vault');
-  const key = await vaultKeyFrom(pin, cloud.vault.salt, cloud.vault.iter);
-  try { const c = await openJSON(key, cloud.vault.check); if (c.ok !== 'uravu') throw 0; } catch (e) { throw new Error('wrong pin'); }
+  const { raw, key } = await vaultOpenRaw(pin, cloud.vault); raw.fill(0);
   await vaultKeep(key);
+}
+// Change the PIN: the vault key stays the same, it is locked again with the new PIN. Documents and files aren't
+// touched, so this is one small change to the vault row: it either happens completely or not at all.
+async function vaultChange(oldPin, newPin) {
+  const old = await vaultRefresh(); if (!old) throw new Error('no vault');
+  const { raw, key } = await vaultOpenRaw(oldPin, old);
+  try {
+    const salt = b64(crypto.getRandomValues(new Uint8Array(16))), bits = await vaultBits(newPin, salt, VAULT_ITER), lock = await aesKey(bits); bits.fill(0);
+    const v = { salt, iter: VAULT_ITER, check: old.check, wrap: b64(await sealBytes(lock, raw)) };
+    if (!await cloud.api.updateVault(old, v)) { await vaultRefresh().catch(() => {}); throw new Error('changed'); }   // another device changed it first
+    cloud.vault = v; await vaultKeep(key);
+  } finally { raw.fill(0); }
 }
 // The key is remembered on this device (it can't be read out of the browser), so the PIN is asked once per device
 async function vaultKeep(key) { cloud.key = key; try { await SDB.put('key:' + cloud.user.uid, key); } catch (e) {} }

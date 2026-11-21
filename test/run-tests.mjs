@@ -708,6 +708,37 @@ await test('Vault: documents and files are encrypted before they’re saved; pho
   ok(!fake.files.has(UID + '/vph1'), 'file removed from the account');
 }));
 
+await test('Vault: change the PIN; documents stay readable, the old PIN stops working', cloudOk(async () => {
+  const PIN2 = '13579246', vaultRow = () => fake.rows.get(`${UID}|settings|vault`).data;
+  await A.ev(`await IDB.put('vph2', 'data:text/plain;base64,aGk='); S.docs[0].photos = ['vph2']; save();`); await A.sync();
+  const before = vaultRow(), secretsBefore = live('docs').map(r => r.secret).sort();
+  await A.ev(`ui.stack = [{ p: 'home' }, { p: 'settings' }, { p: 'account' }]; render();`);
+  await A.click('[data-act="acct-vault-chpin"]');
+  ok(await A.ev(`return !!$('#acPinOld') && !!$('#acPinNew2')`), 'shows the change-PIN form');
+  await A.ev(`$('#acPinOld').value = '000000'; $('#acPinNew').value = ${JSON.stringify(PIN2)}; $('#acPinNew2').value = ${JSON.stringify(PIN2)}; $('[data-act="acct-vault-change"]').click();`);
+  await A.waitFor(`return !$('#acVErr').hidden`, 15000);
+  eq(await A.ev(`return $('#acVErr').textContent`), 'The current PIN is wrong.', 'wrong current PIN refused');
+  eq(vaultRow().salt, before.salt, 'vault untouched after a wrong PIN');
+  await A.ev(`$('#acPinOld').value = ${JSON.stringify(PIN)}; $('[data-act="acct-vault-change"]').click();`);
+  await A.waitFor(`return !$('#acPinOld') && vaultState() === 'open'`, 20000);
+  const after = vaultRow();
+  ok(after.salt !== before.salt && /\S/.test(after.wrap || ''), 'vault row has a new salt and a locked key');
+  eq(live('docs').map(r => r.secret).sort(), secretsBefore, 'documents were not re-encrypted');
+  ok(!JSON.stringify(after).includes(PIN2), 'the PIN isn’t stored');
+  // phone 2 stays unlocked and picks up the new vault row
+  await B.waitFor(`return cloud.vault && cloud.vault.salt === ${JSON.stringify(after.salt)} && vaultState() === 'open'`, 8000);
+  eq(await B.ev(`return await IDB.get('vph2')`), 'data:text/plain;base64,aGk=', 'phone 2 still opens files');
+  // locked again, the old PIN no longer opens it; the new one does
+  await B.ev(`await vaultForget(); ui.stack = [{ p: 'home' }, { p: 'settings' }, { p: 'account' }]; render();`);
+  eq(await B.ev(`try { await vaultUnlock(${JSON.stringify(PIN)}); return 'opened'; } catch (e) { return e.message; }`), 'wrong pin', 'old PIN refused');
+  await B.ev(`await vaultUnlock(${JSON.stringify(PIN2)}); await syncNow();`);
+  eq(await B.ev(`return [vaultState(), S.docs.find(d => d.type === 'dl').f.number]`), ['open', 'TN5920150001234'], 'new PIN opens the documents');
+  // a PIN can be changed again (wrapped key → wrapped key), then put back for the later tests
+  eq(await A.ev(`await vaultChange(${JSON.stringify(PIN2)}, ${JSON.stringify(PIN)}); return vaultState();`), 'open', 'changed back');
+  eq(await B.ev(`await vaultForget(); await vaultUnlock(${JSON.stringify(PIN)}); return vaultState();`), 'open', 'original PIN works again');
+  await A.ev(`S.docs[0].photos = []; await IDB.del('vph2'); save();`); await A.sync();
+}));
+
 await test('An old copy saved on a device is checked, added to the account, then removed', cloudOk(async () => {
   const C = await newDevice(fakeApiScript(FAKE_URL), 'phone 3');
   await C.go(BASE + 'serve-404');

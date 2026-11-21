@@ -40,7 +40,7 @@
 <div class="box">
 <p><b>Document numbers (Aadhaar, PAN, policy numbers, licence and others), document notes and names, and every document photo and PDF are encrypted on your device before they are uploaded.</b> The server only ever receives the locked version and cannot open it. Nobody else can either, including the app’s owner, Supabase, or anyone who gets a copy of the database.</p>
 <ul>
-  <li>The lock is AES-256-GCM. The key is made on your device from your <b>vault PIN</b> (PBKDF2 with SHA-256, 600,000 rounds). The PIN and the key are never sent anywhere.</li>
+  <li>The lock is AES-256-GCM. The key is made on your device from your <b>vault PIN</b> (PBKDF2 with SHA-256, 600,000 rounds). The PIN is never sent anywhere, and the key is never sent unlocked. If you change your PIN, the same key is locked with your new PIN and that locked copy is saved in your account.</li>
   <li>Files go into a private storage area with one folder per person. They are fetched only through links that expire after one minute.</li>
   <li><b>If you forget your vault PIN, the vault can’t be opened or recovered</b>, by you or anyone else. There is no other copy of the locked documents, so write the PIN down somewhere safe.</li>
   <li>A short PIN is easier to guess for someone who has a copy of the locked data. A longer PIN or passphrase is much safer.</li>
