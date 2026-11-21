@@ -423,6 +423,19 @@ details.more[open] summary{margin-bottom:-4px}
 .pdfcard small{color:var(--muted)}
 .pdfcard p{margin:6px 0 0;color:var(--muted);font-size:.9rem}
 .viewer .btn-s:not(.p):not(.danger){background:var(--bg);color:var(--ink)}
+/* profile photo adjuster */
+.cropper{position:fixed;inset:0;z-index:60;background:#0B0C0E;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px))}
+.cropper h2{margin:0;font-size:1.15rem}
+.cropper .crop-hint{margin:0;color:#C9CDD3;font-size:.88rem}
+.crop-stage{position:relative;width:min(84vw,340px,56vh);aspect-ratio:1;touch-action:none;cursor:grab;user-select:none}
+.crop-stage:active{cursor:grabbing}
+.crop-stage canvas{width:100%;height:100%;display:block}
+.crop-ring{position:absolute;inset:0;border-radius:50%;box-shadow:0 0 0 2px rgba(255,255,255,.9),0 0 0 9999px rgba(0,0,0,.55);pointer-events:none}
+.crop-stage{overflow:hidden;border-radius:6px}
+.crop-tools{display:flex;align-items:center;gap:10px;width:min(84vw,340px);font-size:1.2rem}
+.crop-tools input{flex:1;accent-color:var(--primary)}
+.crop-rot{width:40px;height:40px;border-radius:50%;border:1.5px solid rgba(255,255,255,.4);background:transparent;color:#fff;font-size:1.25rem;cursor:pointer}
+.cropper .btn-s:not(.p){background:var(--bg);color:var(--ink)}
 .tree .tl.main{stroke:var(--primary);opacity:.95;stroke-width:2.4}
 .tree-size{position:relative;margin:0 auto}
 .tbar{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:6px;margin:0 0 6px}

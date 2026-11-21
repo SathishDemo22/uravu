@@ -447,16 +447,101 @@ function readPhoto(file) {
   const r = new FileReader();
   r.onload = () => {
     const img = new Image();
-    img.onload = () => {
-      const cv = document.createElement('canvas'), s = 240, m = Math.min(img.width, img.height);
-      cv.width = cv.height = s;
-      cv.getContext('2d').drawImage(img, (img.width - m) / 2, (img.height - m) / 2, m, m, 0, 0, s, s);
-      pendingPhoto = cv.toDataURL('image/jpeg', 0.82);
-      $('#photoPrev').innerHTML = `<span class="av xl"><img src="${pendingPhoto}" alt=""></span>`;
-    };
+    img.onload = () => photoCropOpen(img);
+    img.onerror = () => toast('That photo couldn’t be opened. Try another one.');
     img.src = r.result;
   };
   r.readAsDataURL(file);
+}
+
+/* ---------- profile photo: preview and adjust before it is used ---------- */
+// Drag to move, pinch / wheel / slider to zoom, ⟳ to turn. The circle shows exactly what is kept.
+let photoCrop = null;
+const CROP_OUT = 240;   // saved size, in pixels
+function photoCropOpen(img) {
+  // work from a copy no bigger than 1600px, so huge phone photos stay quick
+  const k = Math.min(1, 1600 / Math.max(img.width, img.height)), src = document.createElement('canvas');
+  src.width = Math.round(img.width * k); src.height = Math.round(img.height * k);
+  src.getContext('2d').drawImage(img, 0, 0, src.width, src.height);
+  photoCropClose();
+  const el = document.createElement('div');
+  el.className = 'cropper'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Adjust photo');
+  el.innerHTML = `<h2>Adjust photo</h2><p class="crop-hint">Drag to move · pinch or slide to zoom</p>
+    <div class="crop-stage"><canvas></canvas><div class="crop-ring" aria-hidden="true"></div></div>
+    <div class="crop-tools"><span aria-hidden="true">−</span><input type="range" min="1" max="4" step="0.01" value="1" aria-label="Zoom"><span aria-hidden="true">＋</span>
+      <button type="button" class="crop-rot" data-crop="rot" aria-label="Turn photo">⟳</button></div>
+    <div class="qbtns"><button type="button" class="btn-s" data-crop="cancel">Cancel</button><button type="button" class="btn-s p" data-crop="use">Use photo</button></div>`;
+  document.body.appendChild(el);
+  const stage = el.querySelector('.crop-stage'), cv = el.querySelector('canvas'), zoomIn = el.querySelector('input');
+  const c = photoCrop = { el, src, cv, zoomIn, z: 1, x: 0, y: 0, size: 0, ptrs: new Map(), pinch: null };
+  const fit = () => {
+    c.size = stage.clientWidth; const dpr = window.devicePixelRatio || 1;
+    cv.width = cv.height = Math.round(c.size * dpr); cropDraw();
+  };
+  c.onResize = fit; window.addEventListener('resize', fit); fit();
+  zoomIn.addEventListener('input', () => cropZoom(+zoomIn.value));
+  stage.addEventListener('wheel', e => { e.preventDefault(); cropZoom(c.z * (e.deltaY < 0 ? 1.08 : 1 / 1.08)); }, { passive: false });
+  stage.addEventListener('pointerdown', e => { stage.setPointerCapture(e.pointerId); c.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); c.pinch = null; });
+  stage.addEventListener('pointermove', e => {
+    const p = c.ptrs.get(e.pointerId); if (!p) return;
+    const nx = e.clientX, ny = e.clientY;
+    if (c.ptrs.size === 1) { c.x += nx - p.x; c.y += ny - p.y; p.x = nx; p.y = ny; cropDraw(); return; }
+    p.x = nx; p.y = ny;
+    const [a, b] = [...c.ptrs.values()], d = Math.hypot(a.x - b.x, a.y - b.y);
+    if (c.pinch) cropZoom(c.pinch.z * d / c.pinch.d); else c.pinch = { d, z: c.z };
+  });
+  const up = e => { c.ptrs.delete(e.pointerId); c.pinch = null; };
+  stage.addEventListener('pointerup', up); stage.addEventListener('pointercancel', up);
+  el.addEventListener('click', e => {
+    const b = e.target.closest('[data-crop]'); if (!b) return;
+    if (b.dataset.crop === 'rot') cropRotate();
+    else if (b.dataset.crop === 'use') cropUse();
+    else photoCropClose();
+  });
+  el.querySelector('[data-crop="use"]').focus();
+}
+// scale at which the photo just covers the circle
+const cropBase = c => c.size / Math.min(c.src.width, c.src.height);
+function cropClamp(c) {
+  const s = cropBase(c) * c.z, mx = Math.max(0, (c.src.width * s - c.size) / 2), my = Math.max(0, (c.src.height * s - c.size) / 2);
+  c.x = Math.min(mx, Math.max(-mx, c.x)); c.y = Math.min(my, Math.max(-my, c.y));
+}
+function cropZoom(z) {
+  const c = photoCrop; if (!c) return;
+  z = Math.min(4, Math.max(1, z));
+  const r = z / c.z; c.x *= r; c.y *= r; c.z = z;   // zoom about the middle
+  c.zoomIn.value = z; cropDraw();
+}
+function cropPaint(ctx, c, out) {
+  const k = out / c.size, s = cropBase(c) * c.z * k, w = c.src.width * s, h = c.src.height * s;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(c.src, (out - w) / 2 + c.x * k, (out - h) / 2 + c.y * k, w, h);
+}
+function cropDraw() {
+  const c = photoCrop; if (!c || !c.size) return;
+  cropClamp(c);
+  const ctx = c.cv.getContext('2d'); ctx.clearRect(0, 0, c.cv.width, c.cv.height); cropPaint(ctx, c, c.cv.width);
+}
+function cropRotate() {
+  const c = photoCrop, r = document.createElement('canvas');
+  r.width = c.src.height; r.height = c.src.width;
+  const ctx = r.getContext('2d'); ctx.translate(r.width, 0); ctx.rotate(Math.PI / 2); ctx.drawImage(c.src, 0, 0);
+  const ox = c.x; c.x = -c.y; c.y = ox;   // turn the offset with the photo
+  c.src = r; cropDraw();
+}
+function cropUse() {
+  const c = photoCrop, out = document.createElement('canvas');
+  out.width = out.height = CROP_OUT;
+  cropPaint(out.getContext('2d'), c, CROP_OUT);
+  pendingPhoto = out.toDataURL('image/jpeg', 0.82);
+  const prev = $('#photoPrev'); if (prev) prev.innerHTML = `<span class="av xl"><img src="${pendingPhoto}" alt=""></span>`;
+  photoCropClose();
+}
+function photoCropClose() {
+  const c = photoCrop; if (!c) return false;
+  window.removeEventListener('resize', c.onResize); c.el.remove(); photoCrop = null;
+  const inp = $('#photoIn'); if (inp) inp.value = '';   // so picking the same file again still opens the adjuster
+  return true;
 }
 
 /* ---------- event form ---------- */

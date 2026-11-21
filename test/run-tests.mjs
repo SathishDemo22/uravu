@@ -399,6 +399,37 @@ await test('Download: guest list, family tree image, document photo', async () =
   const j = await waitDownload(/\.jpg$/); ok(fs.statSync(j.file).size > 500, 'photo saved');
 });
 
+await test('Profile photo: preview and adjust before it is used; Back cancels', async () => {
+  await fresh();
+  // a wide photo: red on the left, blue on the right
+  const png = await ev(`const c = document.createElement('canvas'); c.width = 400; c.height = 200; const x = c.getContext('2d');
+    x.fillStyle = '#f00'; x.fillRect(0, 0, 200, 200); x.fillStyle = '#00f'; x.fillRect(200, 0, 200, 200); return c.toDataURL('image/png').split(',')[1];`);
+  const f = path.join(OUT, 'wide.png'); fs.writeFileSync(f, Buffer.from(png, 'base64'));
+  const pick = async () => {
+    await cdp('DOM.enable'); const { root } = await cdp('DOM.getDocument', { depth: -1, pierce: true });
+    const { nodeId } = await cdp('DOM.querySelector', { nodeId: root.nodeId, selector: '#photoIn' });
+    await cdp('DOM.setFileInputFiles', { nodeId, files: [f] }); await sleep(700);
+  };
+  await ev(`H.edit(S.me)`); await sleep(400);
+  await pick(); ok(await ev(`return !!$('.cropper')`), 'adjuster opens after choosing a photo');
+  await backGesture(); ok(await ev(`return !$('.cropper') && cur().p === 'edit' && pendingPhoto === null`), 'Back closes the adjuster, form stays, photo not taken');
+  await pick();
+  // drag right: the left (red) side moves into the circle
+  const a = await center('.crop-stage');
+  await cdp('Input.dispatchMouseEvent', { type: 'mousePressed', x: a.x, y: a.y, button: 'left', clickCount: 1 });
+  for (let i = 1; i <= 6; i++) { await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: a.x + i * 40, y: a.y, button: 'left', buttons: 1 }); await sleep(16); }
+  await cdp('Input.dispatchMouseEvent', { type: 'mouseReleased', x: a.x + 240, y: a.y, button: 'left', clickCount: 1 });
+  await shot('photo-adjust');
+  await click('.cropper [data-crop="use"]');
+  const px = await ev(`const i = new Image(); i.src = pendingPhoto; await i.decode(); const c = document.createElement('canvas'); c.width = i.width; c.height = i.height;
+    const x = c.getContext('2d'); x.drawImage(i, 0, 0); return { w: i.width, h: i.height, mid: [...x.getImageData(120, 120, 1, 1).data].slice(0, 3), shown: !!$('#photoPrev img'), open: !!$('.cropper') };`);
+  eq([px.w, px.h], [240, 240], 'saved photo is 240x240');
+  ok(px.mid[0] > 200 && px.mid[2] < 60, 'kept the part dragged into the circle: ' + px.mid);
+  ok(px.shown && !px.open, 'preview shows the adjusted photo and the adjuster closes');
+  await click('[data-act="save-person"]');
+  ok(await ev(`return S.people[S.me].photo.startsWith('data:image/jpeg')`), 'photo saved on the person');
+});
+
 await test('Every page and sheet opens without errors', async () => {
   await fresh();
   const list = await ev(`const f = S.funcs[0].id, d = S.docs[0], dr = S.docs.find(x => x.terms.length);

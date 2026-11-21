@@ -303,6 +303,7 @@ function openTab(id) {
 // Close a viewer or full-screen tree first, before leaving the page
 function closeOverlay() {
   const c = cur();
+  if (photoCropClose()) return true;
   if (c.view) { delete c.view; rerender(); return true; }
   if (c.p === 'family' && c.full) { c.full = false; rerender(); return true; }
   if (document.querySelector('.ppick-dd:not([hidden])')) { ppickClose(); return true; }
@@ -607,5 +608,5 @@ document.addEventListener('keydown', e => {
   if (e.target.closest('#qlike')) { e.preventDefault(); qlikeSave(); }
   else if (e.target.id === 'askIn' && !e.shiftKey) { e.preventDefault(); askAI(e.target.value); }
 });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && ui.stack.length > 1 && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) back(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && photoCrop) { photoCropClose(); return; } if (e.key === 'Escape' && ui.stack.length > 1 && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) back(); });
 
