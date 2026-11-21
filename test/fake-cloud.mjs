@@ -10,6 +10,8 @@ export function startFakeCloud(port) {
   const rows = new Map();           // `${uid}|${table}|${id}` -> row
   const files = new Map();          // `${uid}/${name}` -> base64
   let last = 0;
+  const streams = new Map();       // uid -> Set of open event streams (live updates)
+  const notify = (uid, t) => { for (const res of streams.get(uid) || []) res.write(`data: ${t}\n\n`); };
   const serverAt = () => { last = Math.max(Date.now() * 1000, last + 1); return new Date(Math.floor(last / 1000)).toISOString().replace('Z', String(last % 1000).padStart(3, '0') + 'Z'); };
   const of = (uid, t) => [...rows.values()].filter(r => r.owner_id === uid && r.t === t);
   const strip = r => { const o = Object.assign({}, r); delete o.t; return o; };
@@ -37,6 +39,7 @@ export function startFakeCloud(port) {
         if (old && r.updated_at < old.updated_at) continue;   // older edit: keep the newer row
         rows.set(k, Object.assign({}, r, { owner_id: uid, t, server_at: serverAt() })); done.push(r.id);
       }
+      if (done.length) setTimeout(() => notify(uid, t), 30);   // like Supabase Realtime: every device of this user hears it
       return done;
     },
     count({ t }, uid) { need(uid); return of(uid, t).filter(r => !r.deleted).length; },
@@ -61,6 +64,14 @@ export function startFakeCloud(port) {
   const server = http.createServer((req, res) => {
     const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type, authorization', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
     if (req.method === 'OPTIONS') { res.writeHead(204, cors).end(); return; }
+    if (req.method === 'GET' && req.url.startsWith('/events')) {
+      const uid = new URL(req.url, 'http://x').searchParams.get('uid') || '';
+      res.writeHead(200, Object.assign({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' }, cors));
+      res.write(': open\n\n');
+      if (!streams.has(uid)) streams.set(uid, new Set());
+      streams.get(uid).add(res); req.on('close', () => streams.get(uid).delete(res));
+      return;
+    }
     let body = ''; req.on('data', d => { body += d; });
     req.on('end', () => {
       try {
@@ -74,6 +85,7 @@ export function startFakeCloud(port) {
   server.listen(port, '127.0.0.1');
   return {
     server, users, rows, files,
+    close() { for (const set of streams.values()) for (const res of set) res.end(); server.close(); },
     rowsOf: (uid, t) => of(uid, t),
     uidOf: email => (users.get(email) || {}).uid,
   };
@@ -113,5 +125,10 @@ export const fakeApiScript = url => `(() => {
     removeFiles: names => call('removeFiles', { names }),
     listFiles: () => call('listFiles', {}),
     async deleteAccount() { await call('deleteAccount', {}); setMe(null, 'SIGNED_OUT'); },
+    subscribe(fn) {
+      const es = new EventSource(URL0 + 'events?uid=' + encodeURIComponent(me ? me.uid : ''));
+      es.onopen = () => fn('live'); es.onmessage = () => fn('change'); es.onerror = () => fn('down');
+      return () => es.close();
+    },
   };
 })();`;

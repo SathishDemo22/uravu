@@ -609,6 +609,17 @@ await test('Second phone signs in and takes the account’s data; edits go both 
   eq(await B.ev('return [S.people.appa.phone, S.people.appa.likes.some(l => l.val === "Mysore pak"), S.funcs[0].guests[0].rsvp]'), ['9000000001', true, 'maybe'], 'phone 2 got the edits');
 }));
 
+await test('Live: a person added on one phone appears on the other by itself (no Sync now)', cloudOk(async () => {
+  await A.waitFor('return cloud.live', 8000); await B.waitFor('return cloud.live', 8000);
+  ok((await A.ev('return cloudStatusText()')).includes('Live'), 'status says live');
+  await A.ev(`ui.stack = [{ p: 'people' }]; render();`);
+  await B.ev(`S.people.live1 = blankPerson('live1', { name: 'Live Kumar', circle: 'friend' }); save();`);
+  await A.waitFor(`return !!S.people.live1`, 8000);   // nobody pressed Sync now
+  await A.waitFor(`return document.querySelector('#app').textContent.includes('Live Kumar')`, 3000);
+  await A.ev(`S.people.live1.phone = '9000000002'; save();`);
+  await B.waitFor(`return S.people.live1 && S.people.live1.phone === '9000000002'`, 8000);
+}));
+
 await test('Offline edits stay on the phone and go up when it’s back online', cloudOk(async () => {
   await A.offline(true);
   await A.ev(`S.people.amma.notes = 'Written offline'; save();`);
@@ -737,7 +748,7 @@ await test('Real Supabase client: server out of reach, the app still opens and s
 });
 
 for (const d of [A, B]) if (d) { try { await send('Target.disposeBrowserContext', { browserContextId: d.ctx }); } catch (e) {} }
-fake.server.close();
+fake.close();
 
 await test('Installable PWA: manifest, icons, service worker', async () => {
   await cdp('Network.setBypassServiceWorker', { bypass: false });
