@@ -6,7 +6,19 @@
   "scripts": {
     "start": "node serve.js 8080",
     "test": "node --experimental-websocket test/run-tests.mjs",
-    "icons": "python tools/make_icons.py"
+    "icons": "python tools/make_icons.py",
+    "lint": "eslint .",
+    "test:cloud": "node test/cloud-rls.mjs",
+    "vendor": "node -e \"require('fs').copyFileSync('node_modules/@supabase/supabase-js/dist/umd/supabase.js','vendor/supabase.js')\""
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@supabase/supabase-js": "^2.109.0",
+    "eslint": "^9.39.5",
+    "espree": "^10.4.0",
+    "globals": "^15.15.0"
+  }
 }
