@@ -516,7 +516,8 @@ async function checkOldCopy(quiet) {
   const wantPhotos = new Set([...(S.docs || []), ...((data && data.docs) || [])].flatMap(d => d.photos || []));
   const missingPhotos = Object.keys(photos).filter(pid => wantPhotos.has(pid) && !inAccount.has(pid));
   cloud.old = { data, photos, missing, missingPhotos, people: data && data.people ? Object.keys(data.people).length : 0 };
-  if (!quiet && cur0().p !== 'oldcopy') push('oldcopy', {});
+  // Open the page by itself only when the old copy holds something the account lacks; otherwise the Home note is enough
+  if (!quiet && (missing.length || missingPhotos.length) && cur0().p !== 'oldcopy') push('oldcopy', {});
   return cloud.old;
 }
 // Add what's missing to the account
