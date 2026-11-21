@@ -177,7 +177,8 @@ await test('Opening a person slides in; Back gesture walks back step by step', a
   let s = await page(); eq([s.p, s.tabs, s.fab], ['person', true, false], 'person page: tab bar stays, no ＋');
   ok(await ev(`return !$('#app .bar [data-act="go-home"]') && !!$('#app .bar [data-act="back"]')`), 'header has Back and no Home button');
   await sleep(300); await shot('14-person-page');
-  await click('[data-act="edit"][data-id="appa"]'); s = await page(); eq([s.p, s.tabs], ['edit', false], 'edit page, tab bar hidden on forms');
+  ok(await ev(`return !$('[data-act="edit"]')`), 'no Edit button: everything is changed on the page itself');
+  await click('[data-act="new"][data-id="appa"]'); s = await page(); eq([s.p, s.tabs], ['edit', false], 'add-person form, tab bar hidden on forms');
   await backGesture(); s = await page(); eq(s.p, 'person', 'back to person');
   await click('#app .bar [data-act="back"]'); s = await page(); eq(s.p, 'people', 'in-app back to People');
   await backGesture(); s = await page(); eq(s.p, 'home', 'back to Home');
@@ -207,8 +208,8 @@ await test('The address shows the page; refresh and links open the same place', 
   eq(await ev('return location.hash'), '#/people/person?id=appa', 'address');
   await touch('.tab[data-id="people"]');   // back to the list by the tab bar
   await touch('.r[data-act="person"][data-id="amma"]');
-  await click('[data-act="edit"][data-id="amma"]');
-  eq(await ev('return location.hash'), '#/people/person?id=amma/edit?id=amma', 'address of a form');
+  await click('[data-act="new"][data-id="amma"]');
+  ok((await ev('return location.hash')).startsWith('#/people/person?id=amma/edit?'), 'address of a form');
   await backGesture(); await backGesture();
   eq(await ev('return location.hash'), '#/people', 'address after Back');
   await touch('.r[data-act="person"][data-id="appa"]');
@@ -224,6 +225,8 @@ await test('The address shows the page; refresh and links open the same place', 
   // something deleted, or made up: stops at the last good page
   await go(BASE + 'serve-404'); await go(BASE + '#/people/person?id=nobody/edit?id=nobody');
   s = await page(); eq(s.p, 'people', 'unknown person cut off');
+  await go(BASE + 'serve-404'); await go(BASE + '#/people/person?id=amma/edit?id=amma');
+  s = await page(); eq([s.p, await ev('return cur().id')], ['person', 'amma'], 'an old edit link opens their page');
   await go(BASE + 'serve-404'); await go(BASE + '#/settings/x');
   s = await page(); eq(s.p, 'home', 'made-up address goes Home');
   await go(BASE + 'serve-404'); await go(BASE + '#family');
@@ -315,12 +318,12 @@ await test('＋ › Add function: sheet, then guest picker', async () => {
   await backGesture(); s = await page(); eq(s.p, 'func', 'function page under it');
 });
 
-await test('Long-press a person: Call, WhatsApp, Edit, Add date, Open', async () => {
+await test('Long-press a person: Call, WhatsApp, Add date, Open', async () => {
   await fresh();
   await ev(`S.people.appa.phone = '98765 43210'; save(); render();`);
   await touch('.ppl[data-act="person"][data-id="appa"]', 750);
   let s = await page(); eq([s.p, s.sheet], ['quick', true], 'quick sheet (and the person page did not open)');
-  eq(await ev(`return [...document.querySelectorAll('#sheet .qi')].map(b => b.textContent.trim())`), ['Call', 'WhatsApp', 'Edit', 'Add date', 'Open'], 'actions');
+  eq(await ev(`return [...document.querySelectorAll('#sheet .qi')].map(b => b.textContent.trim())`), ['Call', 'WhatsApp', 'Add date', 'Open'], 'actions');
   eq(await ev(`return $('#sheet .qi.tel').getAttribute('href')`), 'tel:9876543210', 'call link');
   eq(await ev(`return $('#sheet .qi.wa').getAttribute('href')`), 'https://wa.me/919876543210', 'WhatsApp link');
   await shot('06-long-press');
@@ -330,12 +333,11 @@ await test('Long-press a person: Call, WhatsApp, Edit, Add date, Open', async ()
   s = await page(); eq([s.p, s.sheet], ['event', true], 'Add date sheet');
   ok(await ev(`return $('#ef .pick input[value="amma"]').checked`), 'Amma pre-selected');
   await backGesture(); s = await page(); eq([s.p, s.sheet], ['home', false], 'closed');
-  await touch('.ppl[data-act="person"][data-id="amma"]', 750); await touch('.qi[data-go="edit"]');
-  s = await page(); eq(s.p, 'edit', 'Edit');
-  await backGesture();
-  // no phone saved: Call is shown but disabled
+  // no phone saved: Call is shown but disabled; tapping it opens their page with the phone box ready
   await touch('.ppl[data-act="person"][data-id="amma"]', 750);
   eq(await ev(`return $('#sheet .qi.tel').getAttribute('aria-disabled')`), 'true', 'Call disabled without a number');
+  await touch('#sheet .qi.tel'); await sleep(400);
+  s = await page(); eq([s.p, s.sheet, await ev(`return !!$('#qfIn[type="tel"]')`)], ['person', false, true], 'phone box open on their page');
   await backGesture();
   // long-press works on the tree and on lists too
   await touch('.tab[data-id="family"]'); await touch('.tnode[data-id="amma"]', 750);
@@ -410,9 +412,10 @@ await test('Profile photo: preview and adjust before it is used; Back cancels', 
     const { nodeId } = await cdp('DOM.querySelector', { nodeId: root.nodeId, selector: '#photoIn' });
     await cdp('DOM.setFileInputFiles', { nodeId, files: [f] }); await sleep(700);
   };
-  await ev(`H.edit(S.me)`); await sleep(400);
+  await ev(`H.person(S.me)`); await sleep(400);
+  ok(await ev(`return !!$('.ph .ph-photo #photoIn')`), 'photo is tappable on the person page');
   await pick(); ok(await ev(`return !!$('.cropper')`), 'adjuster opens after choosing a photo');
-  await backGesture(); ok(await ev(`return !$('.cropper') && cur().p === 'edit' && pendingPhoto === null`), 'Back closes the adjuster, form stays, photo not taken');
+  await backGesture(); ok(await ev(`return !$('.cropper') && cur().p === 'person' && !S.people[S.me].photo`), 'Back closes the adjuster, page stays, photo not taken');
   await pick();
   // drag right: the left (red) side moves into the circle
   const a = await center('.crop-stage');
@@ -421,20 +424,62 @@ await test('Profile photo: preview and adjust before it is used; Back cancels', 
   await cdp('Input.dispatchMouseEvent', { type: 'mouseReleased', x: a.x + 240, y: a.y, button: 'left', clickCount: 1 });
   await shot('photo-adjust');
   await click('.cropper [data-crop="use"]');
-  const px = await ev(`const i = new Image(); i.src = pendingPhoto; await i.decode(); const c = document.createElement('canvas'); c.width = i.width; c.height = i.height;
-    const x = c.getContext('2d'); x.drawImage(i, 0, 0); return { w: i.width, h: i.height, mid: [...x.getImageData(120, 120, 1, 1).data].slice(0, 3), shown: !!$('#photoPrev img'), open: !!$('.cropper') };`);
+  const px = await ev(`const i = new Image(); i.src = S.people[S.me].photo; await i.decode(); const c = document.createElement('canvas'); c.width = i.width; c.height = i.height;
+    const x = c.getContext('2d'); x.drawImage(i, 0, 0); return { w: i.width, h: i.height, mid: [...x.getImageData(120, 120, 1, 1).data].slice(0, 3), shown: !!$('.ph .av.xl img'), open: !!$('.cropper') };`);
   eq([px.w, px.h], [240, 240], 'saved photo is 240x240');
   ok(px.mid[0] > 200 && px.mid[2] < 60, 'kept the part dragged into the circle: ' + px.mid);
-  ok(px.shown && !px.open, 'preview shows the adjusted photo and the adjuster closes');
-  await click('[data-act="save-person"]');
+  ok(px.shown && !px.open, 'saved straight away, the page shows it and the adjuster closes');
   ok(await ev(`return S.people[S.me].photo.startsWith('data:image/jpeg')`), 'photo saved on the person');
+  // remove it from the name box
+  await click('[data-act="qh-open"]'); await click('[data-act="photo-clear"]'); await click('[data-act="photo-clear"]');
+  ok(await ev(`return !S.people[S.me].photo && !$('.ph .av.xl img')`), 'photo removed');
+});
+
+await test('Person page: name and every detail change right on the page', async () => {
+  await fresh();
+  await ev(`H.person('appa')`); await sleep(400);
+  // name, Tamil name and nickname
+  await click('[data-act="qh-open"]');
+  await ev(`$('#qhName').value = 'Ramasamy K'; $('#qhTa').value = 'ராமசாமி'; $('#qhNick').value = 'Ramu';`);
+  await click('[data-act="qh-save"]');
+  eq(await ev(`const p = S.people.appa; return [p.name, p.tamilName, p.nickname, $('.ph-name').textContent.trim()]`), ['Ramasamy K', 'ராமசாமி', 'Ramu', 'Ramasamy K'], 'name saved and shown');
+  await click('[data-act="qh-open"]'); await ev(`$('#qhName').value = ''`); await click('[data-act="qh-save"]');
+  eq(await ev(`return [S.people.appa.name, !!$('#qhName')]`), ['Ramasamy K', true], 'an empty name is not saved');
+  await click('[data-act="qh-cancel"]');
+  // a typed detail: phone, saved with Enter
+  await click('[data-act="qf-open"][data-id="phone"]');
+  await ev(`$('#qfIn').value = '98400 12345'; $('#qfIn').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));`); await sleep(100);
+  eq(await ev(`return [S.people.appa.phone, !$('#qfIn'), !!$('.acts a[href^="tel:"]')]`), ['98400 12345', true, true], 'phone saved, Call shows');
+  // groups split by commas
+  await click('[data-act="qf-open"][data-id="groups"]'); await ev(`$('#qfIn').value = 'Temple, Village ,'`); await click('[data-act="qf-save"]');
+  eq(await ev('return S.people.appa.groups'), ['Temple', 'Village'], 'groups');
+  // birthday row in Important dates opens the birthday box
+  await ev(`S.people.appa.dob = '1960-03-04'; save(); rerender();`);
+  await click('.r[data-act="qf-open"][data-id="dob"]');
+  ok(await ev(`return $('#qfIn').type === 'date' && $('#qfIn').value === '1960-03-04'`), 'birthday box opens from the date row');
+  await ev(`$('#qfIn').value = '1961-05-06'`); await click('[data-act="qf-save"]');
+  eq(await ev('return S.people.appa.dob'), '1961-05-06', 'birthday changed');
+  // taps that save straight away
+  await click('#aboutCard [data-act="set-relage"][data-v="elder"]');
+  eq(await ev('return S.people.appa.relAge'), 'elder', 'older or younger');
+  await click('#aboutCard [data-act="set-dead"][data-v="1"]');
+  ok(await ev(`return S.people.appa.dead && !!$('#aboutCard [data-act="qf-open"][data-id="dod"]')`), 'passed away, date row shows');
+  await click('#aboutCard [data-act="set-dead"][data-v=""]');
+  ok(await ev(`return !S.people.appa.dead && !$('#aboutCard [data-id="dod"]')`), 'alive again');
+  // gender not saved: the note offers Male / Female right there
+  await ev(`S.people.joseph.gender = ''; save(); H.person('joseph');`); await sleep(400);
+  await click('.pov-note [data-act="set-gender"][data-g="m"]');
+  ok(await ev(`return S.people.joseph.gender === 'm' && !$('.pov-note [data-act="set-gender"]')`), 'gender set from the note');
+  await shot('person-inline-edit');
+  await ev(`H.person('appa')`); await sleep(400); await click('[data-act="qf-open"][data-id="callAs"]'); await sleep(200);
+  await shot('person-about-card');
 });
 
 await test('Every page and sheet opens without errors', async () => {
   await fresh();
   const list = await ev(`const f = S.funcs[0].id, d = S.docs[0], dr = S.docs.find(x => x.terms.length);
     return [['people', {}], ['people', { f: 'friend' }], ['dates', {}], ['dates', { tab: 'once' }], ['family', {}], ['family', { pov: 'amma' }], ['family', { full: true }],
-      ['person', { id: 'me' }], ['person', { id: 'appa' }], ['person', { id: 'arjun' }], ['person', { id: 'joseph' }], ['edit', { id: 'appa' }], ['edit', { id: '', relTo: 'appa' }],
+      ['person', { id: 'me' }], ['person', { id: 'appa' }], ['person', { id: 'arjun' }], ['person', { id: 'joseph' }], ['person', { id: 'appa', qh: 1 }], ['person', { id: 'appa', qf: 'groups' }], ['edit', { id: '', relTo: 'appa' }],
       ['event', { eid: '' }], ['event', { eid: S.events[0].id }], ['settings', {}], ['genders', {}], ['living', {}], ['moi', {}], ['docs', {}], ['docs', { f: 'due' }],
       ['doc', { id: d.id }], ['docedit', { id: d.id }], ['docedit', { id: '', type: 'health_ins' }], ['docedit', { id: '' }], ['term', { doc: dr.id, term: '' }], ['term', { doc: dr.id, term: dr.terms[0].id }],
       ['funcs', {}], ['func', { id: f }], ['func', { id: f, open: S.funcs[0].guests[0].id }], ['funcedit', { id: f }], ['funcedit', { id: '' }], ['funcadd', { id: f }],

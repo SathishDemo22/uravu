@@ -405,9 +405,10 @@ function extraTxt(x) {
   if (!(x.years > 0)) return '';
   return x.kind === 'birthday' ? `Turns ${x.years}` : x.kind === 'anniversary' ? `${x.years} years` : `${x.years} year${x.years === 1 ? '' : 's'} ago`;
 }
-function dateRow(x, label) {
+// field: on the person page, tapping a birthday / remembrance day changes that date in place
+function dateRow(x, label, field) {
   const names = x.kind === 'birthday' || x.kind === 'memorial' ? '' : x.people.map(id => S.people[id]?.name).filter(Boolean).join(', ');
-  return `<button class="r ${isSoon(x) ? 'soon' : ''}" data-act="${x.id ? 'event-edit' : 'person'}" data-id="${esc(x.id || x.people[0])}">
+  return `<button class="r ${isSoon(x) ? 'soon' : ''}" data-act="${field ? 'qf-open' : x.id ? 'event-edit' : 'person'}" data-id="${esc(field || x.id || x.people[0])}">
     <span class="cal"><b>${x.date.getDate()}</b><small>${MONTHS[x.date.getMonth()]}</small></span>
     <span class="tx"><span class="t1">${esc(label || x.title)}</span><span class="t2">${esc([extraTxt(x), names].filter(Boolean).join(', '))}</span></span>
     <span class="when">${whenTxt(x.days)}</span></button>`;
