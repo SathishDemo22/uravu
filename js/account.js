@@ -55,8 +55,16 @@ function acctSignIn(c) {
 function acctSignedIn(c) {
   const vs = vaultState(), nd = (S.docs || []).length;
   let vault;
-  if (vs === 'open') vault = `<p class="muted" style="margin:0">Unlocked on this device. Document numbers, notes, photos and PDFs are locked on this device before they’re saved to your account.</p>
+  if (vs === 'open' && c.chpin) vault = `<p class="muted" style="margin:0">Your documents stay as they are. Only the PIN that opens them changes. Your other signed-in devices stay unlocked; when a device asks for the PIN, use the new one.</p>
+      <label class="fld">Current vault PIN<input id="acPinOld" type="password" inputmode="numeric" autocomplete="current-password"></label>
+      <label class="fld">New vault PIN <span class="hint">At least 6 digits. A longer PIN is much safer.</span><input id="acPinNew" type="password" inputmode="numeric" autocomplete="new-password"></label>
+      <label class="fld">Type the new PIN again<input id="acPinNew2" type="password" inputmode="numeric" autocomplete="new-password"></label>
+      <div class="pov-note warn" style="margin-top:12px"><b>If you forget the new PIN, your vault can’t be opened.</b> Write it down somewhere safe.</div>
+      <p class="err" id="acVErr" role="alert"${c.verr ? '' : ' hidden'}>${esc(c.verr || '')}</p>
+      <div class="qbtns"><button class="btn-s p" data-act="acct-vault-change">Change PIN</button><button class="btn-s" data-act="acct-vault-chpin-no">Cancel</button></div>`;
+  else if (vs === 'open') vault = `<p class="muted" style="margin:0">Unlocked on this device. Document numbers, notes, photos and PDFs are locked on this device before they’re saved to your account.</p>
       ${cloud.lockedN ? `<p class="muted">Opening ${cloud.lockedN} document${cloud.lockedN === 1 ? '' : 's'}…</p>` : ''}
+      <button class="link-btn" data-act="acct-vault-chpin">Change vault PIN</button><br>
       <button class="link-btn" data-act="acct-vault-forget">Lock the vault on this device</button>`;
   else if (vs === 'locked') vault = `<p class="muted" style="margin:0">Enter your vault PIN to open your documents on this device${cloud.lockedN ? ` (${cloud.lockedN} waiting)` : ''}. It’s asked once per device.</p>
       <label class="fld">Vault PIN<input id="acPin" type="password" inputmode="numeric" autocomplete="off"></label>
@@ -166,7 +174,24 @@ Object.assign(H, {
     try { await vaultUnlock(pin); } catch (e) { if (e.message === 'wrong pin') throw say('That PIN is wrong.'); throw e; }
     c.verr = ''; toast('Vault unlocked'); rerender(); await syncNow(); rerender();
   }),
-  'acct-vault-forget': async () => { await vaultForget(); rerender(); toast('Vault locked on this device'); },
+  'acct-vault-chpin': () => { const c = cur(); c.chpin = true; delete c.verr; rerender(); $('#acPinOld')?.focus(); },
+  'acct-vault-chpin-no': () => { const c = cur(); delete c.chpin; delete c.verr; rerender(); },
+  'acct-vault-change': (id, a) => acRun(a, 'acVErr', async c => {
+    const p0 = $('#acPinOld').value, p1 = $('#acPinNew').value, p2 = $('#acPinNew2').value;
+    if (!p0) throw say('Enter your current vault PIN.');
+    if (p1.length < 6) throw say('The new PIN needs at least 6 digits or characters.');
+    if (p1 !== p2) throw say('The two new PINs don’t match.');
+    if (p1 === p0) throw say('The new PIN is the same as the current one.');
+    if (readOnly() || !navigator.onLine) throw say('You’re offline. Change the PIN when you’re back online.');
+    try { await vaultChange(p0, p1); }
+    catch (e) {
+      if (e.message === 'wrong pin') throw say('The current PIN is wrong.');
+      if (e.message === 'changed') throw say('The PIN was just changed on another device. Use that PIN as the current one.');
+      throw e;
+    }
+    delete c.chpin; c.verr = ''; rerender(); toast('Vault PIN changed');
+  }),
+  'acct-vault-forget': async () => { const c = cur(); delete c.chpin; await vaultForget(); rerender(); toast('Vault locked on this device'); },
   'acct-delete': () => { cur().del = true; rerender(); $('#acDel')?.focus(); },
   'acct-delete-no': () => { const c = cur(); delete c.del; delete c.derr; rerender(); },
   'acct-delete-go': (id, a) => acRun(a, 'acDErr', async c => {
@@ -185,7 +210,7 @@ Object.assign(H, {
 });
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter' || !e.target.id) return;
-  const go = { acPass: 'acct-signin', acEmail: 'acct-signin', acCode: 'acct-verify', acPin: null, acPin2: 'acct-vault-create', acDel: 'acct-delete-go' }[e.target.id];
+  const go = { acPass: 'acct-signin', acEmail: 'acct-signin', acCode: 'acct-verify', acPin: null, acPin2: 'acct-vault-create', acPinNew2: 'acct-vault-change', acDel: 'acct-delete-go' }[e.target.id];
   const act = e.target.id === 'acPin' ? ($('#acPin2') ? null : 'acct-vault-unlock') : go;
   if (act) { e.preventDefault(); $(`[data-act="${act}"]`)?.click(); }
 });
