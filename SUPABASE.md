@@ -19,6 +19,7 @@ Open **SQL Editor › New query**. Paste in each file below, in this order, and 
 1. `supabase/migrations/20261121000100_uravu_tables.sql`: the 10 tables, row-level security on every table, and the newest-edit-wins trigger
 2. `supabase/migrations/20261121000200_uravu_vault_storage.sql`: the private `vault` bucket and its folder-per-user rules
 3. `supabase/migrations/20261121000300_uravu_delete_account.sql`: the "Delete my account" function
+4. `supabase/migrations/20261121000400_uravu_realtime.sql`: live updates, so a change on one device appears on the others by itself
 
 Each file can be run again safely.
 
@@ -122,8 +123,9 @@ Your real people are in the browser where you entered them. Do these steps **in 
 ## How the sync works (for reference)
 
 - The device is the main copy. The app still saves to `localStorage` (`uravu.v1`) exactly as before, so all the offline features keep working.
-- When signed in, a sync compares the data with what was last synced. It does this a few seconds after each change, on opening, when the internet comes back, and every 2 minutes while the app is open. Changed rows are pushed, and rows changed on other devices are pulled.
+- When signed in, a sync compares the data with what was last synced. It does this about a second after each change, on opening, when the internet comes back, when the app comes back to the screen, and every 2 minutes. Changed rows are pushed, and rows changed on other devices are pulled.
+- **Live updates:** each signed-in device listens to Supabase Realtime for changes to its own user's rows (RLS applies). When another device saves something, this device pulls it in within a second or two. If the live connection drops (for example, a phone in the background), the app catches up as soon as it's back on screen.
 - Each row has `owner_id, id, data, updated_at, deleted, server_at`. The newest `updated_at` wins, and the database itself refuses an older edit (the `uravu_touch` trigger). Deleting something sets `deleted = true` and blanks its details.
 - Sync bookkeeping (what was last synced, edits waiting to go up, vault data waiting for a PIN) is kept in IndexedDB (`uravu-sync`). Edits made offline wait there safely until the next sync.
 - **Vault:** document numbers, notes, names, file names, and every photo and PDF are encrypted on the device with AES-256-GCM. The key comes from the vault PIN (PBKDF2-SHA256, 600,000 rounds, random salt). Only the encrypted text (`docs.secret`, `doc_terms.secret`) and encrypted files reach Supabase. A forgotten PIN can't be recovered.
-- **Not yet supported:** changing the vault PIN, and seeing changes from another device instantly (the app checks every 2 minutes and on every change instead).
+- **Not yet supported:** changing the vault PIN.

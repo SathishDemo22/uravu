@@ -8,7 +8,7 @@ const CLOUD_TABLES = ['settings', 'people', 'likes', 'links', 'events', 'docs', 
 const VAULT_TABLES = { docs: ['f', 'note', 'title', 'fileMeta'], doc_terms: ['f'] };   // these fields are encrypted
 const VAULT_ITER = 600000;
 // status: off | signedout | setup | syncing | synced | offline | error
-const cloud = { api: null, user: null, status: 'off', last: '', err: '', key: null, vault: null, pending: 0, lockedN: 0, needsRender: false };
+const cloud = { api: null, user: null, status: 'off', last: '', err: '', key: null, vault: null, pending: 0, lockedN: 0, needsRender: false, live: false };
 
 /* ---------- data ⇄ rows ---------- */
 function hashStr(str) {   // cyrb53: a quick fingerprint, only to notice changes
@@ -184,6 +184,13 @@ function supabaseApi() {
       const out = []; for (let off = 0; ; off += 1000) { const d = ok(await bucket().list(me.uid, { limit: 1000, offset: off })); d.forEach(f => out.push(f.name)); if (d.length < 1000) break; }
       return out;
     },
+    // Live updates: call fn whenever one of this user's rows changes on another device (RLS applies here too)
+    subscribe(fn) {
+      const ch = sb.channel('uravu-' + me.uid);
+      for (const t of CLOUD_TABLES) ch.on('postgres_changes', { event: '*', schema: 'public', table: t, filter: 'owner_id=eq.' + me.uid }, () => fn('change'));
+      ch.subscribe(st => fn(st === 'SUBSCRIBED' ? 'live' : st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED' ? 'down' : ''));
+      return () => { sb.removeChannel(ch); };
+    },
     async deleteAccount() {
       const files = await this.listFiles();
       for (let i = 0; i < files.length; i += 100) await this.removeFiles(files.slice(i, i + 100));
@@ -203,7 +210,7 @@ function cloudStatusText() {
   if (s === 'offline') return 'Offline. Changes are saved on this device and will sync when you’re back online.';
   if (s === 'error') return 'Couldn’t sync: ' + (cloud.err || 'unknown problem') + '. Your changes are safe on this device.';
   const v = docsWaiting() ? (cloud.vault ? ' Documents wait for your vault PIN.' : ' Set a vault PIN to back up documents.') : '';
-  return 'Synced' + (cloud.last ? ' ' + agoTxt(cloud.last) : '') + '.' + v;
+  return 'Synced' + (cloud.last ? ' ' + agoTxt(cloud.last) : '') + '.' + (cloud.live ? ' Live: changes from your other devices appear by themselves.' : '') + v;
 }
 function agoTxt(iso) {
   const s = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000));
@@ -345,7 +352,7 @@ let detectTimer = null;
 function syncSoon() {
   if (!cloud.user || !syncState || !syncState.setup) return;
   clearTimeout(detectTimer); detectTimer = setTimeout(() => locked(detect), 400);
-  clearTimeout(syncTimer); syncTimer = setTimeout(() => runSync(), 3000);
+  clearTimeout(syncTimer); syncTimer = setTimeout(() => runSync(), 1200);
 }
 const syncNow = () => { clearTimeout(syncTimer); return runSync(); };
 
@@ -364,12 +371,27 @@ async function onSignedIn(u) {
     return;
   }
   setStatus('synced'); rerender();
-  runSync();
+  runSync(); liveStart();
 }
 function onSignedOut() {
+  liveStop();
   cloud.user = null; syncState = null; cloud.key = null; cloud.vault = null; cloud.lockedN = 0;
   setStatus(cloud.api ? 'signedout' : 'off');
 }
+// Live updates: another device saved something, so pull it in now (short pause, so a burst of changes is one sync)
+let liveOff = null, liveTimer = null;
+function liveStart() {
+  if (liveOff || !cloud.user || !syncState || !syncState.setup || !cloud.api.subscribe) return;
+  try {
+    liveOff = cloud.api.subscribe(ev => {
+      if (ev === 'change') { clearTimeout(liveTimer); liveTimer = setTimeout(() => runSync(), 400); }
+      else if (ev === 'live') { if (!cloud.live) { cloud.live = true; runSync(); } }   // also catch anything missed while disconnected
+      else if (ev === 'down') cloud.live = false;
+      if (ev) setStatus(cloud.status);
+    });
+  } catch (e) { liveOff = null; }
+}
+function liveStop() { if (liveOff) { try { liveOff(); } catch (e) {} } liveOff = null; cloud.live = false; clearTimeout(liveTimer); }
 // mode: 'upload' (this device's data goes up and joins what's in the account; where both have the same item, this device's wins)
 //       'replace' (this device takes the account's data; a backup file of this device is saved first)
 async function cloudStart(mode) {
@@ -386,7 +408,7 @@ async function cloudStart(mode) {
     });
   }
   else { syncState = newState(); syncState.setup = true; await saveState(); }
-  await syncNow();
+  await syncNow(); liveStart();
 }
 async function cloudSignOut(clearDevice) {
   clearTimeout(syncTimer);
@@ -451,5 +473,5 @@ async function cloudInit() {
 }
 window.addEventListener('online', () => { if (cloud.user) runSync(); });
 window.addEventListener('offline', () => { if (cloud.user) setStatus('offline'); });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && cloud.user && (!cloud.last || Date.now() - Date.parse(cloud.last) > 30000)) runSync(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && cloud.user) { runSync(); if (!cloud.live) { liveStop(); liveStart(); } } });
 setInterval(() => { if (document.visibilityState === 'visible' && cloud.user) runSync(); }, 120000);
