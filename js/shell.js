@@ -310,6 +310,28 @@ function closeOverlay() {
   if (document.querySelector('.ppick-dd:not([hidden])')) { ppickClose(); return true; }
   return false;
 }
+/* ---------- leaving the app: Back from Home asks first ---------- */
+// One extra history step sits under Home (see main.js). Back from Home lands on it and asks;
+// Back again from there, or Exit, leaves the app.
+function exitAsk(show) {
+  const host = $('#exitAsk');
+  if (!show) { host.hidden = true; host.innerHTML = ''; return; }
+  ppickClose();
+  host.hidden = false;
+  host.innerHTML = `<div class="scrim" data-act="exit-stay"></div><div class="sheet exit-sheet" role="alertdialog" aria-modal="true" aria-labelledby="exitT" aria-describedby="exitD"><h2 id="exitT">Exit Uravu?</h2><p id="exitD">Swipe back again to leave, or stay here.</p><div class="exit-btns"><button class="btn-s" data-act="exit-stay">Stay</button><button class="btn-s p" data-act="exit-go">Exit</button></div></div>`;
+  host.querySelector('.exit-btns [data-act="exit-stay"]').focus({ preventScroll: true });
+}
+const exitOpen = () => !$('#exitAsk').hidden;
+function exitStay() {
+  exitAsk(false);
+  if (histDepth < 0) { histDepth = 0; history.pushState({ d: 0 }, '', urlAt(0)); syncHistory(); }
+}
+function exitGo() {
+  exitAsk(false);
+  history.back();   // off the first step: the installed app closes; in a browser tab, the page before Uravu opens
+  setTimeout(() => { try { window.close(); } catch (e) {} }, 150);
+  setTimeout(() => { if (document.visibilityState === 'visible' && histDepth < 0) toast('Swipe back once more to close Uravu'); }, 600);
+}
 window.addEventListener('popstate', e => {
   // an address typed or linked by hand: open it as a new place
   if (!e.state || typeof e.state.d !== 'number') {
@@ -319,6 +341,12 @@ window.addEventListener('popstate', e => {
     return;
   }
   const d = e.state.d;
+  if (d >= 0 && exitOpen()) exitAsk(false);   // went forward again while it was asking
+  if (d < 0 && !ignorePop) {
+    histDepth = d;
+    if (closeOverlay()) { exitStay(); return; }   // a viewer or full-screen tree was open: close that first
+    exitAsk(true); return;
+  }
   if (ignorePop) { ignorePop--; histDepth = d; if (!ignorePop) syncHistory(); return; }
   const want = logicalDepth();
   histDepth = d;
@@ -342,6 +370,8 @@ function pressOnly(btn, sel) { btn.closest('.relgrid, .chips, .seg')?.parentElem
 
 const H = {
   back: () => back(),
+  'exit-stay': () => exitStay(),
+  'exit-go': () => exitGo(),
   // Tapping the open tab again: first back to its first page, then up to the top
   'tab-go': id => {
     if (ui.stack[0].p !== id) { openTab(id); return; }
@@ -612,5 +642,5 @@ document.addEventListener('keydown', e => {
   else if (e.target.closest('.ph-edit')) { e.preventDefault(); qhSave(); }
   else if (e.target.id === 'askIn' && !e.shiftKey) { e.preventDefault(); askAI(e.target.value); }
 });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && photoCrop) { photoCropClose(); return; } if (e.key === 'Escape' && ui.stack.length > 1 && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) back(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && exitOpen()) { exitStay(); return; } if (e.key === 'Escape' && photoCrop) { photoCropClose(); return; } if (e.key === 'Escape' && ui.stack.length > 1 && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) back(); });
 

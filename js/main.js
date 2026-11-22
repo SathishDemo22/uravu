@@ -26,6 +26,8 @@ load();
 // open where the address says (a refresh, a reopened app, or an app-icon shortcut like ./#people)
 { const st = parseRoute(location.hash); if (st) ui.stack = st; }
 if (history.state && typeof history.state.d === 'number') histDepth = history.state.d;
-else { histDepth = 0; history.replaceState({ d: 0 }, '', urlAt(0)); }   // a fresh open: Home is the first step back
+// a fresh open: Home is the first step back, with one more step under it so Back from Home asks before leaving
+else { history.replaceState({ d: -1 }, '', urlAt(0)); history.pushState({ d: 0 }, '', urlAt(0)); histDepth = 0; }
+if (histDepth < 0) { history.pushState({ d: 0 }, '', urlAt(0)); histDepth = 0; }   // reloaded while it was asking
 render();
 cloudInit();   // signed in: connect and sync in the background (never holds up opening the app)
