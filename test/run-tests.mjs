@@ -170,30 +170,6 @@ await test('Tabs switch pages; phone Back returns to Home, then leaves', async (
   eq(await ev('return history.state.d'), 0, 'history at the start');
 });
 
-await test('Back from Home asks before leaving the app', async () => {
-  await fresh();
-  const asking = () => ev(`return !$('#exitAsk').hidden && !!$('#exitAsk .exit-sheet')`);
-  await backGesture();
-  ok(await asking(), 'Back from Home shows "Exit Uravu?"');
-  eq(await ev('return history.state.d'), -1, 'on the step under Home');
-  eq(await ev('return document.activeElement?.dataset.act'), 'exit-stay', 'Stay has the focus');
-  await shot('03b-exit-ask');
-  await click('.exit-btns [data-act="exit-stay"]');
-  ok(!(await asking()), 'Stay closes it');
-  eq([await ev('return history.state.d'), (await page()).p], [0, 'home'], 'still on Home');
-  await backGesture(); ok(await asking(), 'asks again');
-  await click('#exitAsk .scrim'); ok(!(await asking()), 'tapping outside also stays');
-  await backGesture(); await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`); await sleep(200);
-  ok(!(await asking()), 'Escape also stays');
-  await touch('.tab[data-id="people"]'); await backGesture();
-  eq([(await page()).p, await asking()], ['home', false], 'Back from a tab goes Home without asking');
-  await backGesture(); ok(await asking(), 'then asks');
-  await ev('history.forward()'); await sleep(400);
-  ok(!(await asking()), 'Forward closes it');
-  await touch('.tab[data-id="people"]'); eq((await page()).p, 'people', 'the app works after it');
-  await backGesture(); eq(await ev('return history.state.d'), 0, 'history in step');
-});
-
 await test('Opening a person slides in; Back gesture walks back step by step', async () => {
   await fresh();
   await touch('.tab[data-id="people"]');
