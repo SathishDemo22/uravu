@@ -1,6 +1,6 @@
 /* Uravu service worker: lets the app open with no internet.
    Change VERSION whenever you publish, so phones pick up the new files. */
-const VERSION = 'uravu-2026-11-22-1';
+const VERSION = 'uravu-2026-11-22-2';
 const SHELL = [
   './', './index.html', './privacy.html', './manifest.webmanifest', './css/app.css', './config.js', './vendor/supabase.js',
   './js/core.js', './js/data.js', './js/views.js', './js/tree.js', './js/person.js', './js/pages.js', './js/shell.js', './js/cloud.js', './js/account.js', './js/main.js',
