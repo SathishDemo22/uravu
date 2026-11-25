@@ -310,7 +310,9 @@ await test('＋ › Add person opens the full form; Add document asks the type i
 
 await test('From contacts: fills Add person and a saved person’s phone (Android picker)', async () => {
   await fresh();
-  const stub = list => `Object.defineProperty(navigator, 'contacts', { configurable: true, value: { getProperties: async () => ['name', 'tel'], select: async () => ${JSON.stringify(list)} } });`;
+  // like Chrome, the picker only opens straight from a tap
+  const stub = list => `Object.defineProperty(navigator, 'contacts', { configurable: true, value: { getProperties: async () => ['name', 'tel'],
+    select: () => navigator.userActivation.isActive ? Promise.resolve(${JSON.stringify(list)}) : Promise.reject(new DOMException('A user gesture is required', 'SecurityError')) } });`;
   await ev(stub([{ name: ['Ravi Kumar'], tel: ['+91 98400 12345'] }]));
   await touch('#fab'); await touch('.mi[data-go="new"]');
   ok(await ev(`return !!$('[data-act="contact-pick"]') && !$('#vcfIn')`), 'picker button, no file picker');
@@ -369,6 +371,15 @@ await test('Long-press a person: Call, WhatsApp, Add date, Open', async () => {
   eq(await ev(`return $('#sheet .qi.tel').getAttribute('href')`), 'tel:9876543210', 'call link');
   eq(await ev(`return $('#sheet .qi.wa').getAttribute('href')`), 'https://wa.me/919876543210', 'WhatsApp link');
   await shot('06-long-press');
+await test('From contacts: if the phone refuses the picker, the button switches to a contact card', async () => {
+  await fresh();
+  await ev(`Object.defineProperty(navigator, 'contacts', { configurable: true, value: { select: () => Promise.reject(new DOMException('No permission', 'NotAllowedError')) } });`);
+  await touch('#fab'); await touch('.mi[data-go="new"]');
+  await click('[data-act="contact-pick"]'); await sleep(200);
+  ok(await ev(`return !$('[data-act="contact-pick"]') && !!$('#vcfIn') && /Android/.test($('.ct-hint').textContent) === /android/i.test(navigator.userAgent)`), 'contact card picker shown instead');
+  ok(await ev(`return $('#toast').textContent.includes('NotAllowedError')`), 'the reason is shown');
+});
+
   await touch('.qi[data-go="person"]'); s = await page(); eq([s.p, s.sheet], ['person', false], 'Open');
   await backGesture(); s = await page(); eq(s.p, 'home', 'Back to Home');
   await touch('.ppl[data-act="person"][data-id="amma"]', 750); await touch('.qi[data-go="event-new"]');

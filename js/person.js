@@ -495,11 +495,18 @@ function readPhoto(file) {
 /* ---------- name, number and photo from the phone's contacts ---------- */
 // Android Chrome lets the app ask for one contact. Everywhere else (iPhone, computers) a contact card
 // file (.vcf) is opened instead, so the button is a file picker there.
-const contactPickOk = () => 'contacts' in navigator && typeof navigator.contacts.select === 'function';
+// If the phone refuses the picker once, the button switches to the contact card file for the rest of the visit.
+let contactPickFailed = false, contactProps = null, contactBusy = false;
+const contactPickOk = () => !contactPickFailed && 'contacts' in navigator && typeof navigator.contacts.select === 'function';
+// Asked once, ahead of time: select() must be called straight from the tap, with nothing awaited before it,
+// or Chrome no longer counts it as coming from the tap and refuses to open the picker.
+if (contactPickOk() && typeof navigator.contacts.getProperties === 'function') navigator.contacts.getProperties().then(p => { contactProps = p; }, () => {});
 function contactBtn() {
   if (contactPickOk()) return `<button type="button" class="chip" data-act="contact-pick">📇 From contacts</button><div id="ctTels"></div>`;
+  const how = /android/i.test(navigator.userAgent) ? 'On Android: Contacts › the person › ⋮ › Share › as a file (.vcf), save it, then pick it here.'
+    : 'On iPhone: Contacts › the person › Share Contact › Save to Files, then pick it here.';
   return `<label class="chip ct-file">📇 From contact card<input type="file" accept=".vcf,text/vcard,text/x-vcard" id="vcfIn" hidden></label><div id="ctTels"></div>
-    <p class="hint-line ct-hint">On iPhone: Contacts › the person › Share Contact › Save to Files, then pick it here.</p>`;
+    <p class="hint-line ct-hint">${how}</p>`;
 }
 // Plain digits; Indian mobile numbers lose +91 / 0 so they match what people type (phoneLinks adds 91 back for WhatsApp)
 function cleanTel(t) {
@@ -507,13 +514,21 @@ function cleanTel(t) {
   const m = s.match(/^(?:\+91|0091|91|0)([6-9]\d{9})$/);   // mobiles only: landlines keep their 0 / +91
   return m ? m[1] : s;
 }
-async function pickContact() {
-  const props = ['name', 'tel'];
-  try { if ((await navigator.contacts.getProperties()).includes('icon')) props.push('icon'); } catch { /* older Chrome: name and number only */ }
-  let got;
-  try { got = await navigator.contacts.select(props, { multiple: false }); } catch { toast('Couldn’t open your contacts. Type the details instead.'); return; }
-  const c = got && got[0]; if (!c) return;   // closed without choosing
-  useContact({ name: (c.name || []).find(Boolean) || '', tels: (c.tel || []).map(cleanTel), photo: (c.icon || [])[0] || null });
+function pickContact() {
+  if (contactBusy) return;   // a second tap while the picker is opening would be refused
+  contactBusy = true;
+  const props = ['name', 'tel'].concat(contactProps && contactProps.includes('icon') ? ['icon'] : []);
+  let ask;
+  try { ask = navigator.contacts.select(props, { multiple: false }); } catch (err) { ask = Promise.reject(err); }
+  ask.then(got => {
+    const c = got && got[0]; if (!c) return;   // closed without choosing
+    useContact({ name: (c.name || []).find(Boolean) || '', tels: (c.tel || []).map(cleanTel), photo: (c.icon || [])[0] || null });
+  }, err => {
+    console.warn('Contact picker refused:', err);
+    contactPickFailed = true;
+    document.querySelectorAll('.ct-row').forEach(r => { r.innerHTML = contactBtn(); });
+    toast(`Your phone didn’t open contacts (${(err && (err.name || err.message)) || 'unknown'}). Use a contact card instead, or type the details.`);
+  }).finally(() => { contactBusy = false; });
 }
 function readVcf(inp) {
   const file = inp.files[0]; if (!file) return;
