@@ -108,6 +108,8 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stro
 .chips::-webkit-scrollbar{display:none}
 .chips.wrap{flex-wrap:wrap;overflow:visible;padding-bottom:0}
 .chip{flex:none;border:1.5px solid var(--line);border-radius:999px;padding:7px 15px;font-size:.92rem;white-space:nowrap}
+.ct-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:4px 0 10px}.ct-row>div:empty{display:none}.ct-row>div{flex-basis:100%}
+.ct-file{display:inline-block;cursor:pointer}.ct-hint{flex-basis:100%;margin:0;font-size:.82rem}
 .chip[aria-pressed="true"]{background:var(--primary-soft);border-color:var(--primary);color:var(--primary);font-weight:600}
 
 /* person page */

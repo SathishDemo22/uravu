@@ -434,6 +434,8 @@ const H = {
   'qf-open': id => { const c = cur(); delete c.qh; c.qf = id; rerender(); const t = $('#qfIn'); if (t) { t.scrollIntoView({ block: 'center' }); t.focus({ preventScroll: true }); } },
   'qf-cancel': () => { delete cur().qf; rerender(); },
   'qf-save': () => qfSave(),
+  'contact-pick': () => pickContact(),
+  'contact-tel': id => contactTel(id),
   'set-relage': (id, a) => { S.people[id].relAge = a.dataset.v; save(); rerender(); },
   'photo-clear': (id, a) => arm(a, 'Tap again to remove', () => { S.people[id].photo = ''; delete cur().qh; save(); rerender(); toast('Photo removed'); }),
   'moi-add': () => { cur().add = 'got'; rerender(); $('#mnPerson')?.focus(); },
@@ -599,6 +601,7 @@ document.addEventListener('input', e => {
 document.addEventListener('change', e => {
   if (e.target.id === 'qrelTo') { cur().qrel.to = e.target.value; $('#qrelgrid').innerHTML = qrelChips(e.target.value); }
   if (e.target.id === 'photoIn') readPhoto(e.target.files[0]);
+  if (e.target.id === 'vcfIn') readVcf(e.target);
   if (e.target.id === 'restoreIn') readRestore(e.target.files[0]);
   if (e.target.id === 'docPhotoIn') [...e.target.files].forEach(readDocPhoto);
   if (e.target.closest && e.target.closest('#faList')) faCount();

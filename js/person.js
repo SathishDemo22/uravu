@@ -89,7 +89,8 @@ function fieldRow(id, c, f) {
   const v = f === 'groups' ? (p.groups || []).join(', ') : p[f] || '';
   if (c.qf === f) return `<div class="ab-row ed"><label class="ab-l" for="qfIn">${label}</label><div class="qlike" style="margin-top:6px">
     <input id="qfIn" class="qin${f === 'callAs' ? ' ta' : ''}" type="${type}" value="${esc(v)}" placeholder="${esc(ph)}" autocomplete="off">
-    <div class="qbtns"><button class="btn-s p" data-act="qf-save">Save</button><button class="btn-s" data-act="qf-cancel">Cancel</button></div></div></div>`;
+    <div class="qbtns"><button class="btn-s p" data-act="qf-save">Save</button><button class="btn-s" data-act="qf-cancel">Cancel</button></div>
+    ${f === 'phone' ? `<div class="ct-row">${contactBtn()}</div>` : ''}</div></div>`;
   const shown = type === 'date' && v ? fmtDate(v) : v;
   return `<button class="ab-row" data-act="qf-open" data-id="${f}"><span class="ab-l">${label}</span>${shown ? `<span class="ab-v">${esc(shown)}</span>` : `<span class="ab-v add">＋ Add</span>`}<span class="pen" aria-hidden="true">${ICON.edit}</span></button>`;
 }
@@ -317,6 +318,7 @@ function pgEdit(c) {
   return bar(title) + `<div id="pf" data-id="">
     <input type="hidden" id="f-rel" value=""><input type="hidden" id="f-circle" value="${esc(preCircle)}">
     <div class="photo-pick"><label aria-label="Choose photo"><span id="photoPrev">${avatar(blankPerson('new', {}), 'xl')}</span><span class="cam">${ICON.camera}</span><input type="file" accept="image/*" id="photoIn" hidden></label></div>
+    <div class="ct-row">${contactBtn()}</div>
     <label class="fld big">Name<input name="name" value="" autocomplete="off" placeholder="Their name"></label>
     <label class="fld">Name in Tamil <span class="hint">Optional</span><input name="tamilName" value="" class="ta" autocomplete="off"></label>
     <div class="fld"><span>Gender <span class="hint">Required, so the Tamil words come out right</span></span><div class="seg"><button type="button" data-act="pick-gender" data-id="m" aria-pressed="true">Male</button><button type="button" data-act="pick-gender" data-id="f" aria-pressed="false">Female</button></div><input type="hidden" name="gender" value="m"></div>
@@ -488,6 +490,99 @@ function readPhoto(file) {
     img.src = r.result;
   };
   r.readAsDataURL(file);
+}
+
+/* ---------- name, number and photo from the phone's contacts ---------- */
+// Android Chrome lets the app ask for one contact. Everywhere else (iPhone, computers) a contact card
+// file (.vcf) is opened instead, so the button is a file picker there.
+const contactPickOk = () => 'contacts' in navigator && typeof navigator.contacts.select === 'function';
+function contactBtn() {
+  if (contactPickOk()) return `<button type="button" class="chip" data-act="contact-pick">📇 From contacts</button><div id="ctTels"></div>`;
+  return `<label class="chip ct-file">📇 From contact card<input type="file" accept=".vcf,text/vcard,text/x-vcard" id="vcfIn" hidden></label><div id="ctTels"></div>
+    <p class="hint-line ct-hint">On iPhone: Contacts › the person › Share Contact › Save to Files, then pick it here.</p>`;
+}
+// Plain digits; Indian mobile numbers lose +91 / 0 so they match what people type (phoneLinks adds 91 back for WhatsApp)
+function cleanTel(t) {
+  const s = String(t || '').replace(/[^\d+]/g, '');
+  const m = s.match(/^(?:\+91|0091|91|0)([6-9]\d{9})$/);   // mobiles only: landlines keep their 0 / +91
+  return m ? m[1] : s;
+}
+async function pickContact() {
+  const props = ['name', 'tel'];
+  try { if ((await navigator.contacts.getProperties()).includes('icon')) props.push('icon'); } catch { /* older Chrome: name and number only */ }
+  let got;
+  try { got = await navigator.contacts.select(props, { multiple: false }); } catch { toast('Couldn’t open your contacts. Type the details instead.'); return; }
+  const c = got && got[0]; if (!c) return;   // closed without choosing
+  useContact({ name: (c.name || []).find(Boolean) || '', tels: (c.tel || []).map(cleanTel), photo: (c.icon || [])[0] || null });
+}
+function readVcf(inp) {
+  const file = inp.files[0]; if (!file) return;
+  file.text().then(t => {
+    inp.value = '';   // so picking the same file again still works
+    const ct = parseVcf(t);
+    if (!ct.name && !ct.tels.length) { toast('No contact found in that file'); return; }
+    useContact(ct);
+  }, () => toast('That file couldn’t be opened.'));
+}
+// Reads the first contact in a vCard file (2.1, 3.0 or 4.0): name, phone numbers and an embedded photo
+function parseVcf(text) {
+  const lines = String(text).replace(/\r\n?/g, '\n').replace(/\n[ \t]/g, '').split('\n');
+  const out = { name: '', tels: [], photo: null };
+  let inCard = false, n = '';
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    if (/^BEGIN:VCARD$/i.test(line.trim())) { inCard = true; continue; }
+    if (/^END:VCARD$/i.test(line.trim())) { if (inCard) break; continue; }
+    if (!inCard) continue;
+    const at = line.indexOf(':'); if (at < 0) continue;
+    const params = line.slice(0, at).split(';'), key = params[0].replace(/^.*\./, '').toUpperCase(), P = params.slice(1).join(';').toUpperCase();
+    if (/QUOTED-PRINTABLE/.test(P)) while (line.endsWith('=') && i + 1 < lines.length) line = line.slice(0, -1) + lines[++i];   // soft line breaks
+    let v = line.slice(line.indexOf(':') + 1);
+    if (/QUOTED-PRINTABLE/.test(P)) v = qpDecode(v, (P.match(/CHARSET=([\w-]+)/) || [0, 'utf-8'])[1]);
+    const unesc = s => s.replace(/\\([,;\\nN])/g, (m0, c) => c === 'n' || c === 'N' ? ' ' : c).trim();
+    if (key === 'FN') out.name = unesc(v);
+    else if (key === 'N') { const [fam, giv, mid, pre, suf] = v.split(/(?<!\\);/).map(unesc); n = [pre, giv, mid, fam, suf].filter(Boolean).join(' '); }
+    else if (key === 'TEL') out.tels.push(cleanTel(v.replace(/^tel:/i, '')));
+    else if (key === 'PHOTO' && !out.photo) {
+      const d = v.match(/^data:([^;,]+)?;base64,(.*)$/i), b64 = d ? d[2] : /ENCODING=(B|BASE64)\b/.test(P) ? v : '';
+      if (b64) try {
+        const bin = atob(b64.replace(/\s/g, '')), u = new Uint8Array(bin.length);
+        for (let k = 0; k < bin.length; k++) u[k] = bin.charCodeAt(k);
+        out.photo = new Blob([u], { type: d && d[1] ? d[1] : 'image/jpeg' });
+      } catch { /* a broken photo is skipped, the rest still comes through */ }
+    }
+  }
+  if (!out.name) out.name = n;
+  return out;
+}
+function qpDecode(s, charset) {
+  const bytes = [];
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === '=' && /^[0-9A-F]{2}$/i.test(s.slice(i + 1, i + 3))) { bytes.push(parseInt(s.slice(i + 1, i + 3), 16)); i += 2; }
+    else bytes.push(s.charCodeAt(i) & 0xff);
+  }
+  try { return new TextDecoder(charset).decode(new Uint8Array(bytes)); } catch { return new TextDecoder().decode(new Uint8Array(bytes)); }
+}
+// Fills the Add person form (name, number, photo) or the open Phone box on someone's page (number only)
+function useContact(ct) {
+  const form = $('#pf'), tels = [...new Set(ct.tels.filter(t => t.replace(/\D/g, '').length >= 5))];
+  const telIn = form ? form.querySelector('[name="phone"]') : $('#qfIn'), self = form ? '' : cur().id;
+  if (form && ct.name) form.querySelector('[name="name"]').value = ct.name;
+  if (!tels.length) toast(form ? `${ct.name || 'That contact'} has no phone number saved` : 'That contact has no phone number');
+  else if (tels.length === 1) telIn.value = tels[0];
+  else $('#ctTels').innerHTML = `<p class="subh">Which number?</p><div class="chips wrap">${tels.map(t => `<button type="button" class="chip" data-act="contact-tel" data-id="${esc(t)}">${esc(t)}</button>`).join('')}</div>`;
+  if (form && ct.photo && !pendingPhoto) readPhoto(ct.photo);   // goes through the photo adjuster, as a picked photo does
+  if (tels.length === 1 && !contactDup(tels[0], self)) toast(form ? `Filled in from ${ct.name || 'contacts'}` : 'Number filled in. Tap Save.');
+}
+function contactTel(t) {
+  const i = $('#pf [name="phone"]') || $('#qfIn'); if (!i) return;
+  i.value = t; $('#ctTels').innerHTML = ''; contactDup(t, $('#pf') ? '' : cur().id);
+}
+// Warns, without stopping you, when the number already belongs to someone saved
+function contactDup(t, self) {
+  const p = Object.values(S.people).find(x => x.id !== self && x.phone && cleanTel(x.phone) === t);
+  if (p) toast(`This number is already saved for ${p.id === S.me ? 'you' : p.name}`);
+  return !!p;
 }
 
 /* ---------- profile photo: preview and adjust before it is used ---------- */

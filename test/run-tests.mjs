@@ -308,6 +308,48 @@ await test('＋ › Add person opens the full form; Add document asks the type i
   await backGesture(); s = await page(); eq(s.p, 'home', 'Back from the new document goes Home');
 });
 
+await test('From contacts: fills Add person and a saved person’s phone (Android picker)', async () => {
+  await fresh();
+  const stub = list => `Object.defineProperty(navigator, 'contacts', { configurable: true, value: { getProperties: async () => ['name', 'tel'], select: async () => ${JSON.stringify(list)} } });`;
+  await ev(stub([{ name: ['Ravi Kumar'], tel: ['+91 98400 12345'] }]));
+  await touch('#fab'); await touch('.mi[data-go="new"]');
+  ok(await ev(`return !!$('[data-act="contact-pick"]') && !$('#vcfIn')`), 'picker button, no file picker');
+  await click('[data-act="contact-pick"]'); await sleep(200);
+  eq(await ev(`const f = $('#pf'); return [f.querySelector('[name=name]').value, f.querySelector('[name=phone]').value]`), ['Ravi Kumar', '9840012345'], 'name and number filled, +91 dropped');
+  // two numbers: choose one
+  await ev(stub([{ name: ['Two Phones'], tel: ['044 2345 6789', '+91-98400-55555'] }]));
+  await click('[data-act="contact-pick"]'); await sleep(200);
+  eq(await ev(`return [...document.querySelectorAll('[data-act="contact-tel"]')].map(b => b.dataset.id)`), ['04423456789', '9840055555'], 'both numbers offered, landline keeps its 0');
+  await click('[data-act="contact-tel"][data-id="9840055555"]');
+  eq(await ev(`return [$('#pf [name=phone]').value, $('#ctTels').innerHTML]`), ['9840055555', ''], 'chosen number filled');
+  // closing the picker without choosing changes nothing
+  await ev(stub([]));
+  await click('[data-act="contact-pick"]'); await sleep(200);
+  eq(await ev(`return $('#pf [name=name]').value`), 'Two Phones', 'cancel keeps what was there');
+  // on a saved person's page: only the number
+  await ev(stub([{ name: ['Appa'], tel: ['0 98765 43210'] }]));
+  await ev(`H.person('appa')`); await sleep(400);
+  await click('[data-act="qf-open"][data-id="phone"]');
+  await click('[data-act="contact-pick"]'); await sleep(200);
+  eq(await ev(`return $('#qfIn').value`), '9876543210', 'phone box filled');
+  await click('[data-act="qf-save"]');
+  eq(await ev(`return S.people.appa.phone`), '9876543210', 'saved');
+});
+
+await test('From contact card: reads a .vcf file where the picker isn’t available', async () => {
+  await fresh();
+  await touch('#fab'); await touch('.mi[data-go="new"]');
+  ok(await ev(`return !!$('#vcfIn') && !$('[data-act="contact-pick"]') && !!$('.ct-hint')`), 'file picker with iPhone hint');
+  const vcf = ['BEGIN:VCARD', 'VERSION:2.1', 'N;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:;=E0=AE=AE=E0=AF=81=E0=AE=B0=E0=AF=81=E0=AE=95=E0=AE=A9=E0=AF=8D;;;', 'TEL;CELL:+919840', ' 012345', 'TEL;HOME:+1 (415) 555-0100', 'END:VCARD',
+    'BEGIN:VCARD', 'FN:Second Person', 'TEL:1111111111', 'END:VCARD'].join('\r\n');
+  await ev(`const dt = new DataTransfer(); dt.items.add(new File([${JSON.stringify(vcf)}], 'c.vcf', { type: 'text/vcard' })); const i = $('#vcfIn'); i.files = dt.files; i.dispatchEvent(new Event('change', { bubbles: true }));`);
+  await sleep(300);
+  eq(await ev(`return $('#pf [name=name]').value`), 'முருகன்', 'Tamil name from a quoted-printable card, first card only');
+  eq(await ev(`return [...document.querySelectorAll('[data-act="contact-tel"]')].map(b => b.dataset.id)`), ['9840012345', '+14155550100'], 'folded line joined; other countries kept');
+  const v4 = ['BEGIN:VCARD', 'VERSION:4.0', 'FN:A\\, B', 'TEL;VALUE=uri:tel:+91-98400-11111', 'END:VCARD'].join('\n');
+  eq(await ev(`return parseVcf(${JSON.stringify(v4)})`), { name: 'A, B', tels: ['9840011111'], photo: null }, 'vCard 4 with escapes');
+});
+
 await test('＋ › Add function: sheet, then guest picker', async () => {
   await fresh();
   await touch('#fab'); await touch('.mi[data-go="func-new"]');
